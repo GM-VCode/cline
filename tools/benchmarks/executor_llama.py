@@ -25,21 +25,32 @@ class LlamaExecutor(ModelExecutor):
     """Executor real via llama-server local."""
 
     def __init__(self, url: str = DEFAULT_URL, temperature: float = 0.2,
-                 max_tokens: int = 1024):
+                 max_tokens: int = 2048, enable_thinking: bool = False):
         self.url = url
         self.temperature = temperature
         self.max_tokens = max_tokens
+        self.enable_thinking = enable_thinking
         self.last_raw = None
 
-    def _request(self, instruction: str, project_dir: str) -> dict:
+    def _build_messages(self, instruction: str,
+                        feedback: str = None) -> list:
+        messages = [{"role": "system", "content": SYSTEM},
+                    {"role": "user", "content": instruction}]
+        if feedback:
+            messages.append({"role": "assistant",
+                             "content": "Entendi, vou corrigir."})
+            messages.append({"role": "user", "content": feedback})
+        return messages
+
+    def _request(self, instruction: str, project_dir: str,
+                 feedback: str = None) -> dict:
         payload = {
             "model": "LunarIA",
-            "messages": [
-                {"role": "system", "content": SYSTEM},
-                {"role": "user", "content": instruction},
-            ],
+            "messages": self._build_messages(instruction, feedback),
             "temperature": self.temperature,
             "max_tokens": self.max_tokens,
+            # Qwythos-9B: modelo de raciocínio; desliga o <think>...</think>
+            "chat_template_kwargs": {"enable_thinking": self.enable_thinking},
         }
         req = urllib.request.Request(
             self.url, data=json.dumps(payload).encode("utf-8"),
@@ -50,9 +61,14 @@ class LlamaExecutor(ModelExecutor):
     @staticmethod
     def _extract_content(resp: dict) -> str:
         try:
-            return resp["choices"][0]["message"]["content"] or ""
+            content = resp["choices"][0]["message"]["content"] or ""
         except (KeyError, IndexError):
             return ""
+        # robustez: se o modelo raciocinou, remove o bloco <think>...</think>
+        if "<think>" in content:
+            end = content.find("</think>")
+            content = content[end + len("</think>"):] if end != -1 else content
+        return content
 
     def _parse_files(self, content: str) -> dict:
         """Extrai {\"files\": {...}} do JSON que o modelo devolve."""
@@ -75,7 +91,15 @@ class LlamaExecutor(ModelExecutor):
                 f.write(body)
 
     def execute(self, instruction: str, project_dir: str) -> dict:
-        resp = self._request(instruction, project_dir)
+        return self._run(instruction, project_dir)
+
+    def execute_with_feedback(self, instruction: str, project_dir: str,
+                              feedback: str) -> dict:
+        return self._run(instruction, project_dir, feedback=feedback)
+
+    def _run(self, instruction: str, project_dir: str,
+             feedback: str = None) -> dict:
+        resp = self._request(instruction, project_dir, feedback=feedback)
         self.last_raw = resp
         content = self._extract_content(resp)
         files = self._parse_files(content)
