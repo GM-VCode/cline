@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+# Logs
+*.log
+server_runner*.log
+
+# Modelos GGUF (arquivos grandes - nunca comitar)
+*.gguf
+
+# Temporarios/lixo
+anotacao.txt
+_tmp*
+_*

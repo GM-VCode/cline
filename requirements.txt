@@ -1,0 +1,13 @@
+# ============================================================
+#  requirements.txt - Dependencias do projeto LunarIA/Qwythos-9B
+# ============================================================
+#
+# Este projeto usa APENAS a biblioteca padrao do Python (stdlib):
+#   - os, sys, time, subprocess, urllib  (main.py)
+#
+# Nao ha pacotes externos obrigatorios. O arquivo existe para:
+#   1) Documentar essa decisao;
+#   2) Se voce quiser adicionar dependencias no futuro, basta
+#      lista-las abaixo e rodar:
+#        .venv\Scripts\pip install -r requirements.txt
+# ============================================================
