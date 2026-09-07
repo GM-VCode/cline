@@ -106,5 +106,50 @@ class TestBenchmarkRunner(unittest.TestCase):
         self.assertEqual(r2[0]["files_created"], n1)  # sem duplicar
 
 
+class RetryExecutor(ModelExecutor):
+    """Falha na 1.ª chamada; na 2.ª (com feedback) resolve a tarefa."""
+
+    def __init__(self):
+        self.feedbacks = []
+
+    def execute(self, instruction, project_dir):
+        return {"tool_calls": 0, "retries": 0, "tokens": 5}
+
+    def execute_with_feedback(self, instruction, project_dir, feedback):
+        self.feedbacks.append(feedback)
+        task_id = os.path.basename(project_dir).replace("bench_", "")
+        for task in default_catalog():
+            if task.task_id == task_id:
+                for rel in task.expected_files:
+                    path = os.path.join(project_dir, rel)
+                    os.makedirs(os.path.dirname(path), exist_ok=True)
+                    with open(path, "w", encoding="utf-8") as f:
+                        f.write("def add(a, b):\n    return a + b\n")
+        return {"tool_calls": 2, "retries": 0, "tokens": 50}
+
+
+class TestRetryFeedback(unittest.TestCase):
+    def setUp(self):
+        self.dir = tempfile.mkdtemp(prefix="bench_retry_")
+        self.addCleanup(shutil.rmtree, self.dir, ignore_errors=True)
+
+    def test_retry_com_feedback_recupera_tarefa(self):
+        executor = RetryExecutor()
+        runner = BenchmarkRunner(executor, local_tasks()[:1],
+                                 work_root=self.dir)
+        r = runner.run_all()[0]
+        self.assertTrue(r["finished"])
+        self.assertEqual(r["retries"], 1)
+        self.assertEqual(len(executor.feedbacks), 1)
+        self.assertIn("validação", executor.feedbacks[0])
+
+    def test_max_attempts_1_sem_retry(self):
+        runner = BenchmarkRunner(RetryExecutor(), local_tasks()[:1],
+                                 work_root=self.dir, max_attempts=1)
+        r = runner.run_all()[0]
+        self.assertFalse(r["finished"])
+        self.assertEqual(r["retries"], 0)
+
+
 if __name__ == "__main__":
     unittest.main()

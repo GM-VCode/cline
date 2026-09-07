@@ -24,15 +24,22 @@ class ModelExecutor:
     def execute(self, instruction: str, project_dir: str) -> dict:
         raise NotImplementedError("Plugue um executor real do modelo")
 
+    def execute_with_feedback(self, instruction: str, project_dir: str,
+                              feedback: str) -> dict:
+        """2.ª tentativa: recebe o feedback dos checks que falharam.
+        Default: delega para execute (executores simples ignoram)."""
+        return self.execute(instruction, project_dir)
+
 
 class BenchmarkRunner:
     """Roda tarefas do benchmark e coleta métricas por tarefa."""
 
     def __init__(self, executor: ModelExecutor, tasks: list,
-                 work_root: str = None):
+                 work_root: str = None, max_attempts: int = 2):
         self.executor = executor
         self.tasks = tasks
         self.work_root = work_root or tempfile.gettempdir()
+        self.max_attempts = max(1, max_attempts)
 
     def _fresh_project(self, task_id: str) -> str:
         """Cria um projeto temporário limpo para a tarefa."""
@@ -79,14 +86,29 @@ class BenchmarkRunner:
         self._seed_project(task, project_dir)
 
         started = time.time()
-        try:
-            response = self.executor.execute(task.instruction, project_dir)
-            error = None
-        except Exception as exc:  # pragma: no cover
-            response, error = None, str(exc)
+        retries = 0
+        response, error = None, None
+        checks = []
+        for attempt in range(1, self.max_attempts + 1):
+            try:
+                if attempt == 1:
+                    response = self.executor.execute(task.instruction,
+                                                     project_dir)
+                    error = None
+                else:
+                    feedback = self._format_feedback(checks)
+                    response = self.executor.execute_with_feedback(
+                        task.instruction, project_dir, feedback)
+                    error = None
+                    retries += 1
+            except Exception as exc:  # pragma: no cover
+                response, error = None, str(exc)
+                break
+            checks = task.run_checks(project_dir)
+            if all(ok for _, ok, _ in checks):
+                break
         elapsed = round(time.time() - started, 2)
 
-        checks = task.run_checks(project_dir)
         passed = sum(1 for _, ok, _ in checks if ok)
         finished = error is None and passed == len(checks)
 
@@ -102,10 +124,21 @@ class BenchmarkRunner:
             "files_created": files_changed,
             "elapsed_s": elapsed,
             "tool_calls": (response or {}).get("tool_calls", 0),
-            "retries": (response or {}).get("retries", 0),
+            "retries": retries,
             "tokens": (response or {}).get("tokens", 0),
             "project_dir": project_dir,
         }
+
+    @staticmethod
+    def _format_feedback(checks: list) -> str:
+        """Monta o feedback com os checks que falharam (2.ª tentativa)."""
+        lines = ["Sua resposta anterior não passou na validação. Falhas:"]
+        for name, ok, msg in checks:
+            if not ok:
+                lines.append(f"- {name}: {msg}")
+        lines.append("Corrija os problemas e reenvie o JSON completo dos "
+                     "arquivos necessários.")
+        return "\n".join(lines)
 
     @staticmethod
     def _count_files(project_dir: str) -> int:
