@@ -82,16 +82,17 @@ def default_catalog() -> list:
         ),
         BenchmarkTask(
             "004_bug_multi_arquivo", "bug",
-            "O projeto tem src/app.py importando de src/utils/helpers.py "
-            "que não existe. Crie helpers.py com a função usada.",
+            "O projeto tem src/app.py importando needed() de src/utils/helpers.py "
+            "que não existe. Crie src/utils/helpers.py com a função needed().",
             ["src/app.py", "src/utils/helpers.py"],
             [("app_existe", _file_exists("src/app.py")),
              ("helpers_existe", _file_exists("src/utils/helpers.py"))],
         ),
         BenchmarkTask(
             "005_feature_com_testes", "feature",
-            "Crie string_utils.py com a função slugify(text) e "
-            "test_string_utils.py com ao menos um teste de unittest.",
+            "Crie DOIS arquivos: (1) string_utils.py com a função "
+            "slugify(text) implementada; (2) test_string_utils.py com "
+            "ao menos um teste usando unittest. Ambos na raiz do projeto.",
             ["string_utils.py", "test_string_utils.py"],
             [("mod_existe", _file_exists("string_utils.py")),
              ("teste_existe", _file_exists("test_string_utils.py")),
@@ -107,8 +108,9 @@ def default_catalog() -> list:
         ),
         BenchmarkTask(
             "007_interpretar_erro", "bug",
-            "Rodar python -m unittest deu 'ModuleNotFoundError: calc'. "
-            "Diagnostique e corrija (crie o módulo que falta).",
+            "Rodar python main.py deu 'ModuleNotFoundError: No module "
+            "named calc'. Diagnostique e corrija criando o arquivo "
+            "calc.py na raiz, com a função add(a, b).",
             ["calc.py"],
             [("calc_existe", _file_exists("calc.py"))],
         ),

@@ -48,7 +48,21 @@ class BenchmarkRunner:
             "004_bug_multi_arquivo": {
                 "src/app.py": "from src.utils.helpers import needed\\n\\n\\ndef main():\\n    return needed()\\n",
             },
-            "007_interpretar_erro": {},
+            "005_feature_com_testes": {
+                "string_utils.py": "def slugify(text):\n    return text  # TODO: implementar\n",
+            },
+            "006_refactor_sem_quebrar": {
+                "calc.py": "def add(a, b):\n    return a + b\n",
+            },
+            "007_interpretar_erro": {
+                "main.py": "from calc import add\n\nprint(add(1, 2))\n",
+            },
+            "009_codigo_e_docs": {
+                "calc.py": "def add(a, b):\n    return a + b\n",
+            },
+            "008_projeto_desconhecido": {
+                "src/app.py": "from src.core import process\n\ndef main():\n    return process()\n",
+            },
             "010_consertar_incompleto": {
                 "calc.py": "def add(a, b, c)\\n    return a + b + c\\n",
             },
