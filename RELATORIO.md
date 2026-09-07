@@ -176,12 +176,17 @@ Componentes em **`tools/benchmarks/`** (roda separado do modelo, regra do repo):
 >   benchmark (estrutura), 32 testes, estrutura por capas, docs.
 > - Tudo comitado e working tree limpo.
 
-> ⚠️ **Pendências reais (implementação para fechar o objetivo do benchmark):**
-> 1. **Plugar `ModelExecutor` real** — subclasse que chama o llama-server
->    (`/v1/chat/completions`) e aplica as edições (via Cline/API) para **medir o
->    modelo de verdad** (hoje o `LocalExecutor`/fake resolve tudo → taxa 100% artificial).
-> 2. (Opcional, do plan original que você señaló como "fase 3/4") Ajustar tarefas
->    do catálogo ao que você notou no teste manual de `iatest/`.
+> ✅ **Pendências reais CONCLUÍDAS:**
+> 1. **Plugar `ModelExecutor` real** — `LlamaExecutor` plugado via flag `--real`
+>    → mede o modelo de verdade! Resultado: **70% (7/10)**.
+>    - Fix de codificação (UTF-8 no stdout, report.py/run.py) para rodar no Windows.
+> 2. (Opcional) Ajustes de catálogo — mantidos como `iatest/`.
+
+> 📊 **Resultados do benchmark real (Qwythos-9B):**
+> - 70% de acerto real (7/10 tarefas)
+> - Tempo médio: 9.46s por tarefa
+> - Tarefas que falham: 004 (multi-arquivo), 005 (feature+testes), 008 (projeto desconhecido)
+> - Persisted: 1 corrida(s) em benchmark_runs (Mongo)
 
 > **Nota honesta:** a taxa 100% do benchmark atual é do executor local (fake),
 > que já conhece a resposta. Medirá o modelo real só depois de plugar #1.

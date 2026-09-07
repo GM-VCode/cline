@@ -14,6 +14,13 @@
 import os
 import sys
 
+# Força UTF-8 no stdout para evitar UnicodeEncodeError (cp1252 no Windows CMD)
+if sys.stdout.encoding != "utf-8":
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(
     os.path.abspath(__file__))))
 if ROOT not in sys.path:

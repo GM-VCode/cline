@@ -4,7 +4,15 @@
 #  histórico (Mongo coleção benchmark_runs, fallback JSON).
 # ============================================================
 
+import sys
 import time
+
+# Força UTF-8 no stdout para evitar UnicodeEncodeError (cp1252 no Windows CMD)
+if sys.stdout.encoding != "utf-8":
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
 
 
 class BenchmarkReport:
@@ -58,7 +66,7 @@ class BenchmarkReport:
               f"retries médios: {summary['avg_retries']}")
         print("-" * 62)
         for t in summary["tasks"]:
-            icon = "✅" if t["finished"] else "❌"
+            icon = "[OK]" if t["finished"] else "[X]"
             print(f"  {icon} {t['task_id']:<26} "
                   f"{t['checks_passed']}/{t['checks_total']} checks "
                   f"{t['elapsed_s']}s")
