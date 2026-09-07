@@ -13,3 +13,4 @@ server_runner*.log
 anotacao.txt
 _tmp*
 _*
+*.env
