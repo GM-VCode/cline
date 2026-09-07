@@ -181,7 +181,6 @@ Componentes em **`tools/benchmarks/`** (roda separado do modelo, regra do repo):
 >    → mede o modelo de verdade! Resultado: **70% (7/10)**.
 >    - Fix de codificação (UTF-8 no stdout, report.py/run.py) para rodar no Windows.
 > 2. (Opcional) Ajustes de catálogo — mantidos como `iatest/`.
-
 > 📊 **Resultados do benchmark real (Qwythos-9B):**
 > - Calibragem (seeds + instruções explícitas): 60% → **80%**
 > - **Correção final (`a94c65b`): 100% (10/10 tarefas)**
@@ -197,6 +196,88 @@ Componentes em **`tools/benchmarks/`** (roda separado do modelo, regra do repo):
 > Variabilidade estocástica pode derrubar 1 tarefa numa corrida pontual;
 > o retry com feedback (`execute_with_feedback`, com tests) cobre esse caso.
 
-> 🔮 **Melhias opcionales futuras** (não bloqueantes, quando faça falta):
+> 🔮 **Melhias opcionais futuras** (não bloqueantes, quando fizer falta):
 > - Orçamento de ações (máx. tool_calls/retries por tarefa).
-> - Tests de recuperação (corromper JSON de estado, Mongo cae, etc.).
+
+---
+
+## 8. Fase 5 — Testes de recuperação + Agente REAL (concluída)
+
+### 8.1 Testes de recuperação (`tests/test_recovery.py`, 10 tests)
+Comprovam a resiliência do store em cenários adversos (nenhum código de
+produção precisou mudar — o store já era tolerante, agora isso é **provado**):
+- **JSON corrompido** (`task-state.json`, `validations.json`): leitura vira
+  valor default (`{}`/`[]`); o próximo `save`/`append` reconstrói o arquivo.
+- **Mongo cai no meio da sessão** (simulado com `ConnectionError`):
+  `save`/`load`/`append` caem pro JSON automaticamente, sem lançar exceção,
+  e registram o erro no `error_sink`.
+- **I/O adverso**: `JsonFile.read` corrompido/inexistente → `None`;
+  `write` em path inválido → `False` sem lançar.
+
+### 8.2 Decisão de arquitetura: Mongo primário + JSON fallback (por quê)
+- **Mongo é o primário**: base `cline_agent` com `tasks` (estado da tarefa),
+  `validations` (histórico do validate.py), `diagnostics` (doctor.py) e
+  `benchmark_runs` (corridas do benchmark — permite comparar evolução).
+- **JSON é o plano B por operação**: se o Mongo estiver caído, a mesma chamada
+  grava em `data/json/*.json` sem falhar (testado na 8.1).
+- **Por que não SQL no fallback**: os dados são minúsculos (1 doc de estado +
+  históricos curtos), sem joins nem queries complexas; JSON (stdlib) cobre isso
+  com zero dependência nova. SQL/SQLite só se os históricos crescerem muito —
+  e aí a mudança fica contida na camada `JsonFile`/`HistoryCollection`
+  (a API `TaskStore` não muda).
+
+### 8.3 Agente real (`app/agent/` + `tools/agent.py`)
+O núcleo do agente saiu de dentro do benchmark e virou runtime reutilizável:
+
+| Arquivo | Função |
+|---|---|
+| `app/agent/checks.py` | class `CheckRunner` — roda comando de verificação (ex.: testes) no projeto; a saída vira feedback do erro |
+| `app/agent/runner.py` | class `AgentRunner` — ciclo: modelo → aplica arquivos → verifica → se falhar, reenvia com o **erro real** como feedback (até `max_attempts`) |
+| `tools/agent.py` | CLI: `python tools/agent.py --project <dir> --instruction "..." --check "python test_calc.py"` |
+
+Reutiliza a interface `ModelExecutor` (mesma do benchmark) → `LlamaExecutor`
+serve aos dois.
+
+**Teste real de ponta a ponta (Qwythos-9B no ar):**
+```
+$ python tools/agent.py --project tmp/agent_demo \
+    --instruction "Corrija add() que subtrai em vez de somar" \
+    --check "python test_calc.py"
+finalizado: True  tentativas: 1  retries: 0
+arquivos: ['calc.py', 'test_calc.py']
+verificação: All tests passed!
+```
+O modelo corrigiu o bug e ainda acrescentou `sub`/`mul`/`div` com proteção
+de divisão por zero.
+
+**Validação:** 52 tests OK (44 + 10 recuperação + 8 agente), `validate.py`
+exit 0, commits `392375f` … `5cbada3`.
+
+**Limitação honesta:** o modelo escreve arquivos inteiros via JSON e **não vê
+o conteúdo atual do projeto** (o prompt não inclui a árvore/conteúdo dos
+arquivos). Tarefas em projetos desconhecidos dependem de "adivinhar" a
+estrutura a partir da instrução.
+
+---
+
+## 9. PRÓXIMA ETAPA — Contexto do projeto no prompt (visão do código)
+
+**Objetivo:** dar ao modelo visão do projeto real antes de editar, acabando com
+o "achismo" em projetos desconhecidos (a limitação da 8.3).
+
+**Plano (etapas pequenas, cada uma com teste):**
+1. `app/agent/context.py` — class `ProjectContext`: coleta árvore de arquivos
+   (com limites de tamanho/nº de arquivos) e conteúdo dos arquivos relevantes;
+   `to_prompt()` renderiza esse contexto em texto.
+2. Plug no `AgentRunner`/CLI: instrução enviada ao modelo passa a incluir o
+   contexto (flag `--no-context` para desligar).
+3. Testes com projeto fake (sem modelo): contexto truncado, arquivo binário
+   ignorado, diretório vazio.
+4. Benchmark A/B: rodar `--real` com e sem contexto e comparar taxa/tempo —
+   registrar resultado aqui.
+
+**Critério de conclusão:** benchmark A/B mostra igual ou melhor (esperado:
+tarefa 008 "projeto desconhecido" mais robusta), 52+ tests OK, validate exit 0.
+
+**Riscos:** prompt maior pode estourar `max_tokens` de saída útil → mitiga-se
+com limites no `ProjectContext` (CTX 256k tem folga enorme pro prompt).
