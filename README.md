@@ -78,7 +78,11 @@ classe) → a classe `LlamaServer` (`app/services/server.py`) valida e inicia o
 LunarIA/
 │
 ├── 🚀 main.py                    ← PONTO DE ENTRADA central (só carrega, sem lógica)
-├── 📝 logger.py                  ← class AppLogger (logging a logs/)
+├── 📦 tools/                     ← ★ ferramentas que rodam separadas do modelo
+│   ├── __init__.py
+│   ├── validate.py               ← GATE de validação (compileall + unittest + diff)
+│   ├── doctor.py                 ← diagnóstico do ambiente (class ModelDoctor)
+│   └── logger.py                 ← class AppLogger (logging com níveis → logs/)
 ├── 📦 app/                       ← código do projeto (pacote Python)
 │   ├── __init__.py               ← API pública (Config, LlamaServer, TaskStore)
 │   ├── config.py                 ← class Config: defaults + leitura do .env
@@ -87,6 +91,9 @@ LunarIA/
 │       ├── __init__.py
 │       ├── server.py             ← class LlamaServer: valida, monta args, roda
 │       └── task_store.py         ← re-export de data/mongodb
+├── 🧪 tests/                     ← testes unitarios (unittest, stdlib)
+│   ├── __init__.py
+│   ├── test_config.py · test_server.py · test_task_store.py · test_doctor.py
 │
 ├── 📂 logs/                      ← logs centralizados (.log ignorados)
 │   └── .gitkeep                  ← mantém a carpeta rastreada
@@ -135,7 +142,7 @@ substitue o Cline nem duplica suas ferramentas: **refuerza o SEU comportamento**
 
 ### O que agrega
 
-- **`validate.py`** — um único comando (`python validate.py`) que o agente DEVE
+- **`validate.py`** — um único comando (`python tools/validate.py`) que o agente DEVE
   rodar antes de declarar qualquer tarefa concluida. Roda sintaxis
   (`compileall`), testes unitários (`unittest`) e saneamento do diff
   (`git diff --check`). Exit `0` = pronto; exit `1` = há algo a corrigir.
@@ -154,7 +161,7 @@ substitue o Cline nem duplica suas ferramentas: **refuerza o SEU comportamento**
 1. O agente lê `.clinerules/01-workflow.md` ao começar.
 2. Antes de cada edição: audita, planeja e atualiza `.task-state.json`.
 3. Depois de cada etapa: `python -m unittest discover -s tests -v`.
-4. Antes de concluir: `python validate.py` e revisão do diff.
+4. Antes de concluir: `python tools/validate.py` e revisão do diff.
 
 > ⚙️ Nada disso toca `app/`, `main.py`, `models/`, `visao/`, `bat/` nem
 > aumenta o consumo de VRAM. São capas de **control de qualidade** do agente.

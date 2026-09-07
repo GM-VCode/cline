@@ -22,11 +22,12 @@ for _stream in (sys.stdout, sys.stderr):
         except Exception:  # pragma: no cover
             pass
 
-ROOT = os.path.dirname(os.path.abspath(__file__))
+# doctor.py -> tools/ -> RAIZ (2 dirname)
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
-from logger import AppLogger  # noqa: E402
+from tools.logger import AppLogger  # noqa: E402
 
 try:
     from app.config import Config

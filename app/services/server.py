@@ -17,7 +17,7 @@ if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
 from app.config import Config
-from logger import AppLogger
+from tools.logger import AppLogger
 
 
 class LlamaServer:

@@ -59,9 +59,9 @@ tocan, riscos, estrategia de tests e critério de conclusión.
 Orden de validación:
 
 ```bash
-python -m compileall -q app data/mongodb main.py validate.py tests
+python -m compileall -q app data/mongodb main.py tools tests
 python -m unittest discover -s tests -v
-python validate.py
+python tools/validate.py
 git diff --check
 ```
 

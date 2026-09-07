@@ -15,7 +15,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
-from doctor import ModelDoctor  # noqa: E402
+from tools.doctor import ModelDoctor  # noqa: E402
 from data.mongodb.store import TaskStore  # noqa: E402
 
 
@@ -84,7 +84,7 @@ class TestDoctor(unittest.TestCase):
             os.path.join(self.dir, "diagnostics.json")))
 
     def test_debug_filtrado_por_level(self):
-        from logger import AppLogger
+        from tools.logger import AppLogger
         log_path = os.path.join(self.dir, "level.log")
         log = AppLogger("t", path=log_path, level="INFO")
         log.debug("nao deve aparecer")

@@ -33,7 +33,8 @@ class AppLogger:
     def _default_path(self) -> str:
         if Config is not None and hasattr(Config, "APP_LOG"):
             return Config.APP_LOG
-        root = os.path.dirname(os.path.abspath(__file__))
+        # logger.py -> tools/ -> RAIZ (2 dirname)
+        root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         return os.path.join(root, "logs", "app.log")
 
     def _default_level(self) -> str:

@@ -17,7 +17,10 @@ import os
 import subprocess
 import sys
 
-ROOT = os.path.dirname(os.path.abspath(__file__))
+# validate.py -> tools/ -> RAIZ (2 dirname)
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if ROOT not in sys.path:
+    sys.path.insert(0, ROOT)
 
 
 def _run(cmd: list) -> "tuple[int, str]":
@@ -44,10 +47,9 @@ def main() -> int:
     targets = [
         os.path.join(ROOT, "app"),
         os.path.join(ROOT, "main.py"),
-        os.path.join(ROOT, "validate.py"),
+        os.path.join(ROOT, "tools"),
         os.path.join(ROOT, "tests"),
         os.path.join(ROOT, "data", "mongodb"),
-        os.path.join(ROOT, "data", "mongodb", "scripts"),
     ]
 
     # 1) Sintaxis
@@ -100,7 +102,7 @@ if __name__ == "__main__":
         pass
     # Log a logs/app.log (capa de logging centralizada del proyecto)
     try:
-        from logger import AppLogger
+        from tools.logger import AppLogger
         AppLogger("validate").log(
             "INFO" if rc == 0 else "ERROR",
             f"validate terminó con exit {rc}",

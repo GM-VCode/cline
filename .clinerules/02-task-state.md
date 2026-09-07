@@ -58,7 +58,7 @@ O estado e o histórico de validações se guardam também no seu **MongoDB loca
 .venv\Scripts\python.exe data\mongodb\scripts\memory.py validations 20  # historial
 ```
 
-`validate.py` registra cada corrida em `validations` automaticamente. Os tests
+`tools/validate.py` registra cada corrida em `validations` automaticamente. Os tests
 de `TaskStore` usam **fallback JSON** com paths temporales (não tocam o seu Mongo).
 
 ---
