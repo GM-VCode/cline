@@ -26,6 +26,7 @@ class RuntimePaths:
         self.state_path = os.path.join(self.data_dir, "task-state.json")
         self.validations_path = os.path.join(self.data_dir, "validations.json")
         self.diagnostics_path = os.path.join(self.data_dir, "diagnostics.json")
+        self.benchmarks_path = os.path.join(self.data_dir, "benchmarks.json")
         self.uri = self._setting("MONGODB_URI") or DEFAULT_URI
         self.db_name = self._setting("MONGODB_DB") or DEFAULT_DB
         self.task_id = self._setting("TASK_ID") or "current"

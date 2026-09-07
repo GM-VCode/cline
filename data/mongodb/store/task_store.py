@@ -31,9 +31,10 @@ class TaskStore:
             self.paths.state_path = state_path
         if validations_path:
             self.paths.validations_path = validations_path
-            # diagnostics vive na mesma pasta do runtime informado
-            self.paths.diagnostics_path = os.path.join(
-                os.path.dirname(validations_path), "diagnostics.json")
+            # históricos derivados vivem na mesma pasta do runtime informado
+            base = os.path.dirname(validations_path)
+            self.paths.diagnostics_path = os.path.join(base, "diagnostics.json")
+            self.paths.benchmarks_path = os.path.join(base, "benchmarks.json")
         self.task_id = self.paths.task_id
         self.uri = self.paths.uri
         self.db_name = self.paths.db_name
@@ -53,6 +54,9 @@ class TaskStore:
         self.diagnostics = HistoryCollection(
             self._conn, "diagnostics", self.paths.diagnostics_path,
             "diagnostic", self.task_id, self._catch_error)
+        self.benchmarks = HistoryCollection(
+            self._conn, "benchmark_runs", self.paths.benchmarks_path,
+            "benchmark", self.task_id, self._catch_error)
 
     def _catch_error(self, msg: str):
         self._error = msg
@@ -85,6 +89,13 @@ class TaskStore:
 
     def list_diagnostics(self, limit: int = 20) -> list:
         return self.diagnostics.list(limit)
+
+    # ---------- benchmarks ----------
+    def append_benchmark(self, entry: dict) -> dict:
+        return self.benchmarks.append(entry)
+
+    def list_benchmarks(self, limit: int = 20) -> list:
+        return self.benchmarks.list(limit)
 
     def close(self):
         if self._conn is not None:
