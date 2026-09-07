@@ -183,10 +183,11 @@ Componentes em **`tools/benchmarks/`** (roda separado do modelo, regra do repo):
 > 2. (Opcional) Ajustes de catálogo — mantidos como `iatest/`.
 
 > 📊 **Resultados do benchmark real (Qwythos-9B):**
-> - 70% de acerto real (7/10 tarefas)
-> - Tempo médio: 9.46s por tarefa
-> - Tarefas que falham: 004 (multi-arquivo), 005 (feature+testes), 008 (projeto desconhecido)
-> - Persisted: 1 corrida(s) em benchmark_runs (Mongo)
+> - Após calibragem (seeds + instruções explícitas): **80% (8/10 tarefas)**
+> - Tempo médio: ~7-11s por tarefa; 32 tests OK; validate exit 0
+> - Falhas observadas: 005 (não cria o arquivo de teste) e oscilação
+>   estocástica em tarefas simples (002 falhou numa corrida, passou noutra)
+> - Histórico de corridas persistido em `benchmark_runs` (Mongo)
 
 > **Nota honesta:** a taxa 100% do benchmark atual é do executor local (fake),
 > que já conhece a resposta. Medirá o modelo real só depois de plugar #1.
