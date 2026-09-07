@@ -12,11 +12,12 @@ import urllib.request
 import urllib.error
 
 # Garante que a raiz do projeto esteja no path (p/ import app.config)
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
 from app.config import Config
+from logger import AppLogger
 
 
 class LlamaServer:
@@ -24,6 +25,7 @@ class LlamaServer:
 
     def __init__(self, config: Config):
         self.cfg = config
+        self.log = AppLogger("server")
 
     # ---------- validação ----------
     def validate(self) -> None:
@@ -131,7 +133,11 @@ class LlamaServer:
         self.kill_old()
         time.sleep(2)
 
+        # Asegurar que logs/ exista (logs centralizados del proyecto)
+        os.makedirs(c.LOG_DIR, exist_ok=True)
+
         print("Iniciando llama-server...")
+        self.log.info("iniciando llama-server (PID pendiente)")
         with open(c.LOG_OUT, "w", encoding="utf-8") as out, \
              open(c.LOG_ERR, "w", encoding="utf-8") as err:
             proc = subprocess.Popen(
@@ -141,18 +147,24 @@ class LlamaServer:
                 creationflags=subprocess.CREATE_NO_WINDOW,
             )
             print(f"PID: {proc.pid}")
+            self.log.info(f"llama-server PID {proc.pid}")
 
             if self.wait_health(c.WAIT_HEALTH_SECONDS):
                 print(f"PRONTO: http://{c.HOST}:{c.PORT}/v1  (Model ID: {c.ALIAS})")
+                self.log.info(f"PRONTO: http://{c.HOST}:{c.PORT}/v1 "
+                              f"(Model ID: {c.ALIAS})")
                 print("Logs: " + c.LOG_ERR)
                 print("Pressione CTRL+C para encerrar o servidor.")
                 try:
                     proc.wait()
                 except KeyboardInterrupt:
                     print("Encerrando llama-server...")
+                    self.log.info("encerrando llama-server (CTRL+C)")
                     proc.terminate()
             else:
                 print("FALHOU — veja as últimas linhas de " + c.LOG_ERR)
+                self.log.error(f"health check falhou tras {c.WAIT_HEALTH_SECONDS}s "
+                               f"(ver {c.LOG_ERR})")
                 proc.terminate()
                 if os.path.isfile(c.LOG_ERR):
                     with open(c.LOG_ERR, encoding="utf-8", errors="replace") as f:

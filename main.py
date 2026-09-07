@@ -18,7 +18,7 @@ ROOT = os.path.dirname(os.path.abspath(__file__))
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
-from app.server import LlamaServer  # noqa: E402
+from app.services.server import LlamaServer  # noqa: E402
 from app.config import Config       # noqa: E402
 
 

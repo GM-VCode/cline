@@ -70,15 +70,19 @@ class Config:
             return default
 
     # --------------------------------------------------------
-    # CAMINHOS — BASE_DIR é a RAIZ do projeto (pai de app\)
+    # CAMINOS — BASE_DIR es la RAIZ del proyecto (padre de app\)
     # --------------------------------------------------------
     BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     DOTENV = _load_dotenv(os.path.join(BASE_DIR, ".env"))
 
-    # Caminhos fixos (logs e binário do llama.cpp)
+    # Logs centralizados DENTRO del proyecto (logs/)
+    LOG_DIR = os.path.join(BASE_DIR, "logs")
+    LOG_OUT = os.path.join(LOG_DIR, "llama-server.out.log")
+    LOG_ERR = os.path.join(LOG_DIR, "llama-server.err.log")
+    APP_LOG = os.path.join(LOG_DIR, "app.log")
+
+    # Binário del llama.cpp (global, fora del repo)
     LLAMA_SERVER = r"C:\llama.cpp\llama-server.exe"
-    LOG_OUT = r"C:\llama.cpp\server.log"
-    LOG_ERR = r"C:\llama.cpp\server.err.log"
 
     # --------------------------------------------------------
     # MODELO (default: models\ dentro do projeto)
@@ -129,6 +133,7 @@ class Config:
     # --------------------------------------------------------
     KILL_OLD_INSTANCE = _as_bool(DOTENV, "KILL_OLD_INSTANCE", True)
     WAIT_HEALTH_SECONDS = _as_int(DOTENV, "WAIT_HEALTH_SECONDS", 120)
+    LOG_LEVEL = _get(DOTENV, "LOG_LEVEL", "INFO")
     SHOW_CONFIG_ON_BOOT = _as_bool(DOTENV, "SHOW_CONFIG_ON_BOOT", True)
 
     # --------------------------------------------------------

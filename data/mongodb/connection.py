@@ -1,0 +1,56 @@
+# ============================================================
+#  data/mongodb/connection.py — class MongoConnection
+#  Encapsula la conexión a MongoDB local y el acceso a coleções.
+#  Fino: solo conecta/exponhe. Sin lógica de negocio.
+# ============================================================
+
+from pymongo import MongoClient
+
+
+class MongoConnection:
+    """Wraper fino a MongoDB: conexión, ping y colecciones."""
+
+    def __init__(self, uri: str, db_name: str = "cline_agent",
+                 timeout_ms: int = 2000):
+        self.uri = uri
+        self.db_name = db_name
+        self._client = None
+        self._db = None
+        self.error = None
+        self._connect(timeout_ms)
+
+    def _connect(self, timeout_ms: int):
+        client = None
+        try:
+            client = MongoClient(
+                self.uri,
+                serverSelectionTimeoutMS=timeout_ms,
+                connectTimeoutMS=min(timeout_ms, 2000),
+            )
+            client.admin.command("ping")
+            self._client = client
+            self._db = client[self.db_name]
+        except Exception as exc:  # pragma: no cover
+            if client is not None:
+                try:
+                    client.close()
+                except Exception:
+                    pass
+            self.error = f"Mongo indisponible: {exc}"
+
+    @property
+    def active(self) -> bool:
+        """True si hay conexión válida."""
+        return self._client is not None
+
+    def collection(self, name: str):
+        """Acceso a una colección (tasks, validations...)."""
+        return self._db[name] if self._db is not None else None
+
+    def close(self):
+        """Cierra la conexión si estaba abierta."""
+        if self._client is not None:
+            try:
+                self._client.close()
+            except Exception:
+                pass

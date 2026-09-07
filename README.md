@@ -48,7 +48,7 @@
                                       │ fornece
                                       v
                       ┌───────────────────────────────┐                    ┌─────────────────────┐
-                      │        app/server.py          │    executa         │  llama-server.exe   │
+                      │        app/services/server.py         │    executa         │  llama-server.exe   │
                       │  class LlamaServer            ├───────────────────>│  (C:\llama.cpp)     │
                       │  valida · monta args · roda   │                    └──────────┬──────────┘
                       └───────────────▲───────────────┘                                │
@@ -66,7 +66,7 @@
 
 **Fluxo em palavras:** você configura no `.env` (raiz) → a classe `Config`
 (`app/config.py`) lê o `.env` (o que não estiver lá, usa o default da própria
-classe) → a classe `LlamaServer` (`app/server.py`) valida e inicia o
+classe) → a classe `LlamaServer` (`app/services/server.py`) valida e inicia o
 `llama-server.exe` → `main.py` é só o ponto de entrada central:
 `LlamaServer(Config()).run()`.
 
@@ -78,10 +78,18 @@ classe) → a classe `LlamaServer` (`app/server.py`) valida e inicia o
 LunarIA/
 │
 ├── 🚀 main.py                    ← PONTO DE ENTRADA central (só carrega, sem lógica)
+├── 📝 logger.py                  ← class AppLogger (logging a logs/)
 ├── 📦 app/                       ← código do projeto (pacote Python)
-│   ├── __init__.py
+│   ├── __init__.py               ← API pública (Config, LlamaServer, TaskStore)
 │   ├── config.py                 ← class Config: defaults + leitura do .env
-│   └── server.py                 ← class LlamaServer: valida, monta args, roda
+│   ├── task_store.py             ← re-export TaskStore (compatibilidade)
+│   └── services/                 ← ★ servicios (cada um com sua classe)
+│       ├── __init__.py
+│       ├── server.py             ← class LlamaServer: valida, monta args, roda
+│       └── task_store.py         ← re-export de data/mongodb
+│
+├── 📂 logs/                      ← logs centralizados (.log ignorados)
+│   └── .gitkeep                  ← mantém a carpeta rastreada
 │
 ├── 🖥️ bat/                       ← scripts de inicialização (ver bat/README.md)
 │   ├── INICIAR-Qwythos-9B.bat          → inicia com janela de logs
@@ -100,6 +108,17 @@ LunarIA/
 ├── 🔗 INICIAR-Qwythos-9B.lnk     ← ATALHO na raiz (duplo clique aqui!)
 ├── ⚙️ .env                       ← ★ ONDE VOCÊ CONFIGURA TUDO
 ├── 📋 requirements.txt           ← dependências (só stdlib!)
+├── 🧪 validate.py                ← GATE de validação obrigatório (tests + sintaxis + diff)
+├── 🧪 tests/                     ← testes unitarios (unittest, stdlib)
+├── 🗂️ .clinerules/               ← regras de disciplina do agente (Cline)
+│   ├── 01-workflow.md            ← fluxo: auditar → planear → editar → validar → concluir
+│   └── 02-task-state.md          ← formato do estado da tarefa (memoria)
+├── 📂 data/
+│   ├── json/                     ← runtime JSON (fallback): task-state.json, validations.json
+│   └── mongodb/                  ← capa de BD (conexión, store, scripts)
+│       ├── connection.py         ← class MongoConnection
+│       ├── store.py              ← class TaskStore (estado + validações)
+│       └── scripts/              ← init_mongo.py · memory.py (CLIs)
 ├── 🙈 .gitignore
 └── 📖 README.md                  ← este guia
 ```
@@ -108,6 +127,63 @@ LunarIA/
 
 ---
 
+## 🧭 Fluxo disciplinado de trabalho (agente confiável)
+
+Este repo incluye una capa de **disciplina** para que o agente (Cline) trabalhe
+sobre ele como um engenheiro cuidadoso, não como um gerador de arquivos. Não
+substitue o Cline nem duplica suas ferramentas: **refuerza o SEU comportamento**.
+
+### O que agrega
+
+- **`validate.py`** — um único comando (`python validate.py`) que o agente DEVE
+  rodar antes de declarar qualquer tarefa concluida. Roda sintaxis
+  (`compileall`), testes unitários (`unittest`) e saneamento do diff
+  (`git diff --check`). Exit `0` = pronto; exit `1` = há algo a corrigir.
+- **`tests/`** — suite mínima (unittest, **só stdlib**) que trava a interfaz
+  atual: leitura do `.env` (`Config`) e montagem/validação de argumentos do
+  `LlamaServer`. Sem dependências novas.
+- **`.clinerules/`** — regras nativas do Cline que descrevem o ciclo de trabalho:
+  auditar → planear em etapas → ler antes de editar → patch pequeno → validar →
+  corrigir em loop → revisar diff → só então concluir (mais proibição de
+  escopo/seguridade).
+- **`.task-state.json`** — memória estruturada da tarefa em curso (objetivo,
+  plan com status, arquivos, testes, falhas, decisões).
+
+### Como se usa
+
+1. O agente lê `.clinerules/01-workflow.md` ao começar.
+2. Antes de cada edição: audita, planeja e atualiza `.task-state.json`.
+3. Depois de cada etapa: `python -m unittest discover -s tests -v`.
+4. Antes de concluir: `python validate.py` e revisão do diff.
+
+> ⚙️ Nada disso toca `app/`, `main.py`, `models/`, `visao/`, `bat/` nem
+> aumenta o consumo de VRAM. São capas de **control de qualidade** do agente.
+
+---
+
+
+### 🗄️ Memória persistente (MongoDB local)
+
+O agente guarda o estado da tarefa e o histórico de validações no seu
+**MongoDB local** (`mongodb://localhost:27017/`), com fallback automático a JSON.
+Toda a lógica de BD vive modularizada em `data/mongodb/`.
+
+- **`data/mongodb/connection.py`** — class `MongoConnection`: conexión/coleções.
+- **`data/mongodb/store.py`** — class `TaskStore`: estado + validações (fallback JSON).
+- **`data/mongodb/scripts/init_mongo.py`** — cria a base `cline_agent` (coleções
+  `tasks`, `validations`) e índices.
+- **`data/mongodb/scripts/memory.py`** — CLI para consultar estado e historial.
+
+```bash
+.venv\Scripts\python.exe data\mongodb\scripts\init_mongo.py
+.venv\Scripts\python.exe data\mongodb\scripts\memory.py state
+.venv\Scripts\python.exe data\mongodb\scripts\memory.py validations 10
+```
+
+`validate.py` registra automaticamente cada corrida em `validations`.
+Dependência **opcional** (`pymongo`); se não está, tudo segue igual em modo JSON.
+
+---
 
 ## ⚙️ Configuração (`.env`)
 

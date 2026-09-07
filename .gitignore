@@ -2,7 +2,10 @@
 __pycache__/
 *.py[cod]
 .venv/
-# Logs
+# Logs (se rastrean la carpeta logs/ y .gitkeep, se ignoran los .log)
+logs/*.log
+logs/**/*.log
+!logs/.gitkeep
 *.log
 server_runner*.log
 
@@ -12,5 +15,14 @@ server_runner*.log
 # Temporarios/lixo
 anotacao.txt
 _tmp*
-_*
+# _*  (retirado: coincidía con data/mongodb/__init__.py y lo ignoraba)
+#    Usar _*.tmp si se necesita ignorar temporales con guión bajo
 *.env
+# runtime de validaciones (se regenera com cada validate.py)
+.validations.json
+# Archivos de banco/runtime do agente (se regeneran) — se ignoran
+# por NOMBRE, pero data/json/ y data/ SE RASTREAN (no ignorar carpetas)
+data/json/task-state.json
+data/json/validations.json
+# __pycache__ en toda parte (incl. data/mongodb/)
+__pycache__/

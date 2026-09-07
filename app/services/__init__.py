@@ -1,0 +1,1 @@
+# app/services — servicios del proyecto (server, task_store)

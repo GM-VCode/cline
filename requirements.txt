@@ -11,3 +11,12 @@
 #      lista-las abaixo e rodar:
 #        .venv\Scripts\pip install -r requirements.txt
 # ============================================================
+
+# ------------------------------------------------------------
+# Dependencia OPCIONAL (para a memória/agente via MongoDB):
+#   - pymongo  (app/task_store.py)  -> persistencia en MongoDB local
+#     Instalar:  .venv\Scripts\pip install pymongo
+# Si pymongo no está o MongoDB no está disponible, el flujo
+# sigue funcionando en modo JSON puro (fallback automático).
+# ------------------------------------------------------------
+pymongo>=4.0  # opcional: memoria do agente (MongoDB local)
