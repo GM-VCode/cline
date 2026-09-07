@@ -48,6 +48,17 @@ class MemoryCli:
                   f"{v.get('result', '?')} (exit {v.get('exit_code', '?')})")
         return 0
 
+    def _diagnostics(self, limit: int) -> int:
+        diags = self.store.list_diagnostics(limit=limit)
+        if not diags:
+            print("Nenhum diagnóstico registrado ainda (rode doctor.py).")
+            return 0
+        print(f"=== ÚLTIMOS {len(diags)} DIAGNÓSTICOS ===")
+        for d in diags:
+            print(f"  [{d.get('ts', '?')}] {d.get('verdict', '?')} "
+                  f"(fails={d.get('fails', '?')}, warns={d.get('warns', '?')})")
+        return 0
+
     def run(self, argv) -> int:
         cmd = argv[0] if argv else "state"
         if cmd == "state":
@@ -55,7 +66,10 @@ class MemoryCli:
         if cmd == "validations":
             limit = int(argv[1]) if len(argv) > 1 else 20
             return self._validations(limit)
-        print("Uso: memory.py [state|validations [N]]")
+        if cmd == "diagnostics":
+            limit = int(argv[1]) if len(argv) > 1 else 20
+            return self._diagnostics(limit)
+        print("Uso: memory.py [state|validations|diagnostics [N]]")
         return 2
 
 

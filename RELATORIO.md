@@ -9,7 +9,7 @@
 ## 1. Objetivo
 
 Sair do comportamento `receber tarefa → gerar código → afirmar que terminou`
-para um fluxo disciplinado: **auditar → planear → editar pequeno → validar →
+para um fluxo disciplinado: **auditar → planejar → editar pequeno → validar →
 corrigir em loop → revisar diff → concluir só com validação verde**.
 Sem duplicar Cline, ferramentas, tool calling ou visão. Zero VRAM extra.
 
@@ -108,14 +108,54 @@ tests/                 # suite unitária
 
 ---
 
-## 5. Próxima fase (em andamento)
+## 5. Fase 3 — Ferramenta de diagnóstico (doctor) (concluída)
 
-**Benchmark do agente** (prioridad #1 do plano de melhorias):
-- `benchmarks/tasks/` → projetos pequenos padronizados (bug simples, bug multi-archivo,
-  feature con tests, refactor, etc.).
-- `benchmarks/runner.py` → class `BenchmarkRunner` (ejecuta cada tarea y mide:
-  terminou?, chamadas de ferramenta, archivos alterados, testes, retries, tempo).
-- `benchmarks/report.py` → class `BenchmarkReport` (resumo + histórico em Mongo
-  `benchmark_runs` / JSON fallback).
-- Objetivo: medir objetivamente *"em quantas tarefas reais o modelo chega a
-  solução correta, testada e revisada sem intervenção humana"*.
+Ferramenta que você roda quando nota algo estranho no modelo/ambiente:
+
+```bash
+python doctor.py
+```
+
+- **`doctor.py`** (raiz) — class `ModelDoctor`, 7 checks:
+  1. `paths` — modelo, llama-server, mmproj existem
+  2. `config` — CTX múltiplo de 256, LOG_LEVEL válido
+  3. `logs` — `logs/` gravável
+  4. `state_json` — JSON de estado legível (detecta corrupção)
+  5. `mongo` — conexão (warn se cair no fallback JSON)
+  6. `memoria` — estado da tarefa na memória
+  7. `servidor_api` — `/health` responde (warn se desligado, não é falha)
+- Resultado: `SAUDÁVEL` (0 falhas) ou `PROBLEMAS ENCONTRADOS`; exit 0/1.
+- Salva cada corrida em Mongo (coleção `diagnostics`) ou JSON fallback
+  (`data/json/diagnostics.json`); consulta com
+  `memory.py diagnostics [N]`.
+- Loga em `logs/app.log` com nível INFO/ERROR.
+- Stdout reconfigurado para UTF-8 (emojis funcionam em qualquer console Windows).
+
+### Modularização (regra: arquivo >200 linhas → pasta com o nome dele)
+`data/mongodb/store.py` (206 linhas) virou **`data/mongodb/store/`**:
+| Módulo | Classe | Linhas |
+|---|---|---|
+| `runtime.py` | `RuntimePaths` — paths + config do runtime | 47 |
+| `json_file.py` | `JsonFile` — I/O JSON tolerante | 29 |
+| `history.py` | `HistoryCollection` — append/list Mongo+JSON reutilizável | 62 |
+| `state.py` | `StateRepo` — estado da tarefa | 49 |
+| `task_store.py` | `TaskStore` — fachada pública (mesma API) | 90 |
+
+API pública **intacta**: `from app import TaskStore` e
+`from data.mongodb.store import TaskStore` continuam funcionando.
+Regra gravada em `.clinerules/03-code-structure.md`.
+
+### Testes: 26 no total
++4 novos: doctor saudável, falha com modelo ausente, diagnóstico no fallback
+JSON, filtro de nível no logger.
+
+---
+
+## 6. Próxima fase (a fazer)
+
+**Benchmark do agente** (prioridad #1 do plano de melhorias): medir a
+qualidade real do modelo como programador em tarefas padronizadas.
+- `benchmarks/tasks/` → projetos pequenos padronizados
+- `benchmarks/runner.py` → class `BenchmarkRunner`
+- `benchmarks/report.py` → class `BenchmarkReport` (Mongo `benchmark_runs`)
+- Métricas: terminou?, chamadas, arquivos, testes, retries, tempo, tokens.

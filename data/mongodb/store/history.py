@@ -1,0 +1,63 @@
+# ============================================================
+#  data/mongodb/store/history.py — class HistoryCollection
+#  Histórico genérico (validações, diagnósticos...): append/list
+#  com Mongo ativo e fallback automático a JSON. Reutilizável.
+# ============================================================
+
+import time
+
+from data.mongodb.store.json_file import JsonFile
+
+
+class HistoryCollection:
+    """Append/list com Mongo (se ativo) e fallback a arquivo JSON."""
+
+    def __init__(self, conn, coll_name: str, json_path: str, label: str,
+                 task_id: str = "current", error_sink=None):
+        self.conn = conn
+        self.coll_name = coll_name
+        self.json_path = json_path
+        self.label = label          # p/ mensagens de erro
+        self.task_id = task_id
+        self.error_sink = error_sink or (lambda msg: None)
+
+    @property
+    def _coll(self):
+        return self.conn.collection(self.coll_name) if self.conn else None
+
+    def append(self, entry: dict) -> dict:
+        if not isinstance(entry, dict):
+            entry = {"value": entry}
+        entry = dict(entry)
+        entry.setdefault("task_id", self.task_id)
+        entry.setdefault("ts", time.strftime("%Y-%m-%dT%H:%M:%S"))
+        if self.conn and self.conn.active:
+            try:
+                self._coll.insert_one(dict(entry))
+                return entry
+            except Exception as exc:  # pragma: no cover
+                self.error_sink(f"Falha Mongo ({self.coll_name}): {exc}")
+        return self._append_json(entry)
+
+    def list(self, limit: int = 20) -> list:
+        if self.conn and self.conn.active:
+            try:
+                cursor = (self._coll.find({"task_id": self.task_id})
+                          .sort("_id", -1).limit(limit))
+                out = [{k: v for k, v in doc.items() if k != "_id"}
+                       for doc in cursor]
+                return out
+            except Exception as exc:  # pragma: no cover
+                self.error_sink(f"Falha Mongo (list {self.coll_name}): {exc}")
+        history = JsonFile.read(self.json_path)
+        if not isinstance(history, list):
+            return []
+        return list(reversed(history[-limit:]))
+
+    def _append_json(self, entry: dict) -> dict:
+        history = JsonFile.read(self.json_path)
+        if not isinstance(history, list):
+            history = []
+        history.append(entry)
+        JsonFile.write(self.json_path, history)
+        return entry
