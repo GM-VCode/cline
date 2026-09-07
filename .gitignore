@@ -15,6 +15,7 @@ server_runner*.log
 # Temporarios/lixo
 anotacao.txt
 _tmp*
+tmp/
 # _*  (retirado: coincidía con data/mongodb/__init__.py y lo ignoraba)
 #    Usar _*.tmp si se necesita ignorar temporales con guión bajo
 *.env
