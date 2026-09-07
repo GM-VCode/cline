@@ -2,21 +2,25 @@
 #  main.py — PONTO DE ENTRADA CENTRAL do servidor local
 #
 #  Este arquivo NÃO tem lógica nenhuma: só centraliza o load.
-#  A lógica está em server.py; as configurações, em
-#  server_config.py (que lê o .env desta pasta).
+#  A lógica está na classe LlamaServer (app/server.py); as
+#  configurações, na classe Config (app/config.py), que lê
+#  o .env da raiz do projeto.
 #
 #  Uso:  .venv\Scripts\python.exe main.py
-#        (ou simplesmente rode INICIAR-Qwythos-9B.bat)
+#        (ou pelo atalho INICIAR-Qwythos-9B na raiz)
 # ============================================================
 
 import os
 import sys
 
-# Garante que os imports (server, server_config) sejam encontrados
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+# Garante que a raiz do projeto esteja no path (p/ importar app.*)
+ROOT = os.path.dirname(os.path.abspath(__file__))
+if ROOT not in sys.path:
+    sys.path.insert(0, ROOT)
 
-import server  # noqa: E402  (lógica de inicialização do llama-server)
+from app.server import LlamaServer  # noqa: E402
+from app.config import Config       # noqa: E402
 
 
 if __name__ == "__main__":
-    server.main()
+    LlamaServer(Config()).run()
