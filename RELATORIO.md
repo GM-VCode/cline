@@ -151,11 +151,42 @@ JSON, filtro de nível no logger.
 
 ---
 
-## 6. Próxima fase (a fazer)
+## 6. Fase 4 — Benchmark do agente (concluída)
 
-**Benchmark do agente** (prioridad #1 do plano de melhorias): medir a
-qualidade real do modelo como programador em tarefas padronizadas.
-- `benchmarks/tasks/` → projetos pequenos padronizados
-- `benchmarks/runner.py` → class `BenchmarkRunner`
-- `benchmarks/report.py` → class `BenchmarkReport` (Mongo `benchmark_runs`)
-- Métricas: terminou?, chamadas, arquivos, testes, retries, tempo, tokens.
+Medir a qualidade real do modelo como programador em tarefas padronizadas.
+Componentes em **`tools/benchmarks/`** (roda separado do modelo, regra do repo):
+
+| Arquivo | Função |
+|---|---|
+| `tasks.py` | class `BenchmarkTask` + catálogo padronizado (**10 tarefas**: criar/editar função, bugs simples e multi-arquivo, feature com testes, refactor, interpretar erro, projeto desconhecido, código+docs, consertar incompleto) |
+| `runner.py` | class `ModelExecutor` (stub injetável) + `BenchmarkRunner` (roda cada tarefa em projeto temporário, mete: terminou?, checks, arquivos, tempo, tool_calls, retries, tokens) |
+| `report.py` | class `BenchmarkReport` — resumo (finish_rate, tempo/tool_calls/retries médios) + persistência |
+| `run.py` | **entry point CLI**: `python tools/benchmarks/run.py` → roda, resumo y **persiste no Mongo real** (`benchmark_runs`) |
+
+`TaskStore`: coleção `benchmark_runs` + fallback JSON (`data/json/benchmarks.json`).
+**Verificado:** execução real salvou `benchmark_runs count: 1` no Mongo.
+
+---
+
+## 7. Estado do projeto (o que falta e o que está concluido)
+
+> ✅ **Infraestrutura operacional: CONCLUIDA**
+> - Servidor inicia/encerra, inferência real, API `/v1`, memória Mongo (fallback JSON),
+>   gates (`validate.py`), diagnóstico (`doctor.py`), logging por niveles (`logger.py`),
+>   benchmark (estrutura), 32 testes, estrutura por capas, docs.
+> - Tudo comitado e working tree limpo.
+
+> ⚠️ **Pendências reais (implementação para fechar o objetivo do benchmark):**
+> 1. **Plugar `ModelExecutor` real** — subclasse que chama o llama-server
+>    (`/v1/chat/completions`) e aplica as edições (via Cline/API) para **medir o
+>    modelo de verdad** (hoje o `LocalExecutor`/fake resolve tudo → taxa 100% artificial).
+> 2. (Opcional, do plan original que você señaló como "fase 3/4") Ajustar tarefas
+>    do catálogo ao que você notou no teste manual de `iatest/`.
+
+> **Nota honesta:** a taxa 100% do benchmark atual é do executor local (fake),
+> que já conhece a resposta. Medirá o modelo real só depois de plugar #1.
+
+> 🔮 **Melhias opcionales futuras** (não bloqueantes, quando faça falta):
+> - Revisão automática do diff em 2.º estágio (implementador→revisor).
+> - Orçamento de ações (máx. tool_calls/retries por tarefa).
+> - Tests de recuperação (corromper JSON de estado, Mongo cae, etc.).
