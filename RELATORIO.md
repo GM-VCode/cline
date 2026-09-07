@@ -183,16 +183,20 @@ Componentes em **`tools/benchmarks/`** (roda separado do modelo, regra do repo):
 > 2. (Opcional) Ajustes de catálogo — mantidos como `iatest/`.
 
 > 📊 **Resultados do benchmark real (Qwythos-9B):**
-> - Após calibragem (seeds + instruções explícitas): **80% (8/10 tarefas)**
-> - Tempo médio: ~7-11s por tarefa; 32 tests OK; validate exit 0
-> - Falhas observadas: 005 (não cria o arquivo de teste) e oscilação
->   estocástica em tarefas simples (002 falhou numa corrida, passou noutra)
+> - Calibragem (seeds + instruções explícitas): 60% → **80%**
+> - **Correção final (`a94c65b`): 100% (10/10 tarefas)**
+>   - O Qwythos é modelo de raciocínio (`<think>`): plugar
+>     `chat_template_kwargs: {"enable_thinking": false}` + `max_tokens` 2048
+>     + strip de `<think>` no parser resolveu as falhas/oscilações.
+>   - A 005 (feature com testes, a mais pesada) agora passa: 3/3 checks.
+> - Tempo médio: ~1-10s por tarefa; 34 tests OK; validate exit 0
+> - `.env` intocado (CTX 256k ≫ prompt + 2048 de saída)
 > - Histórico de corridas persistido em `benchmark_runs` (Mongo)
 
-> **Nota honesta:** a taxa 100% do benchmark atual é do executor local (fake),
-> que já conhece a resposta. Medirá o modelo real só depois de plugar #1.
+> **Nota honesta:** 100% é do executor real contra o Qwythos-9B local.
+> Variabilidade estocástica pode derrubar 1 tarefa numa corrida pontual;
+> o retry com feedback (`execute_with_feedback`, com tests) cobre esse caso.
 
 > 🔮 **Melhias opcionales futuras** (não bloqueantes, quando faça falta):
-> - Revisão automática do diff em 2.º estágio (implementador→revisor).
 > - Orçamento de ações (máx. tool_calls/retries por tarefa).
 > - Tests de recuperação (corromper JSON de estado, Mongo cae, etc.).
