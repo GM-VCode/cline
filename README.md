@@ -108,7 +108,7 @@ LunarIA/
 │   ├── Qwythos-9B-...-Q8_0.gguf        → o modelo principal (~10 GB)
 │   └── README.md
 │
-├── 🖼️ visao/                     ← módulo de visão mmproj (ver visao/README.md)
+├── 🖼️ tools/visao/               ← módulo de visão mmproj (ver tools/visao/README.md)
 │   ├── Qwythos-9B-...-mmproj-BF16.gguf → projector multimodal (~921 MB)
 │   └── README.md
 │
@@ -163,7 +163,7 @@ substitue o Cline nem duplica suas ferramentas: **refuerza o SEU comportamento**
 3. Depois de cada etapa: `python -m unittest discover -s tests -v`.
 4. Antes de concluir: `python tools/validate.py` e revisão do diff.
 
-> ⚙️ Nada disso toca `app/`, `main.py`, `models/`, `visao/`, `bat/` nem
+> ⚙️ Nada disso toca `app/`, `main.py`, `models/`, `tools/visao/`, `bat/` nem
 > aumenta o consumo de VRAM. São capas de **control de qualidade** do agente.
 
 ---
@@ -207,11 +207,11 @@ Dependência **opcional** (`pymongo`); se não está, tudo segue igual em modo J
 
 | Variável | O que faz |
 |---|---|
-| `MM_PROJ_PATH` | Caminho do `*-mmproj-*.gguf` (pasta `visao\`) |
+| `MM_PROJ_PATH` | Caminho do `*-mmproj-*.gguf` (pasta `tools\visao\`) |
 | `MM_PROJ_ENABLED` | **`1` = ativa visão** ✅ · **`0` = modo só texto** 💤 (não carrega o mmproj, economiza VRAM) |
 | `IMG_MIN_TOKENS` | Mínimo de tokens por imagem (`1024` recomendado p/ Qwen-VL) |
 
-> 💡 **Modelo sem visão?** `MM_PROJ_ENABLED = 0` — pronto, a pasta `visao\` é ignorada.
+> 💡 **Modelo sem visão?** `MM_PROJ_ENABLED = 0` — pronto, a pasta `tools\visao\` é ignorada.
 > 🔁 **Outro modelo com visão?** O mmproj precisa ser o **daquele** modelo (não é universal).
 
 ### 🖧 Rede e hardware

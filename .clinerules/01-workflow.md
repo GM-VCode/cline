@@ -135,5 +135,5 @@ Una tarefa con un bug deve poder ejecutarse así:
 9. revisar el diff
 10. informar el resultado con honestidad
 
-Si en cualquier momento el `.env`, `models/`, `visao/` ou `bat/` deberían
+Si en cualquier momento el `.env`, `models/`, `tools/visao/` ou `bat/` deberían
 cambiarse, **explícalo e pide permiso** antes de hacerlo.

@@ -103,7 +103,7 @@ tests/                 # suite unitária
 | Logger com níveis (DEBUG filtrado a INFO; ERROR pasa) | ✅ |
 
 ### Preservado (nunca tocado)
-- `.env` (única mudança: `CTX = 256512`, do usuário), `bat/`, `models/`, `visao/`.
+- `.env` (única mudança: `CTX = 256512`, do usuário), `bat/`, `models/`, `tools/visao/`.
 - Interfaces públicas de `Config` e `LlamaServer` sem quebra.
 
 ---

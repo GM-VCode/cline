@@ -98,7 +98,7 @@ class Config:
     # --------------------------------------------------------
     MM_PROJ_PATH = _get(
         DOTENV, "MM_PROJ_PATH",
-        os.path.join(BASE_DIR, "visao", "Qwythos-9B-Claude-Mythos-5-1M-uncensored-heretic-mmproj-BF16.gguf"),
+        os.path.join(BASE_DIR, "tools", "visao", "Qwythos-9B-Claude-Mythos-5-1M-uncensored-heretic-mmproj-BF16.gguf"),
     )
     MM_PROJ_ENABLED = _as_bool(DOTENV, "MM_PROJ_ENABLED", False)
     IMG_MIN_TOKENS = _as_int(DOTENV, "IMG_MIN_TOKENS", 1024)
