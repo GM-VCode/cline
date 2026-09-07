@@ -22,6 +22,7 @@ if ROOT not in sys.path:
 from tools.benchmarks.runner import BenchmarkRunner, ModelExecutor  # noqa: E402
 from tools.benchmarks.tasks import default_catalog  # noqa: E402
 from tools.benchmarks.report import BenchmarkReport  # noqa: E402
+from tools.benchmarks.executor_llama import LlamaExecutor  # noqa: E402
 from data.mongodb.store import TaskStore  # noqa: E402
 
 
@@ -57,7 +58,10 @@ class LocalExecutor(ModelExecutor):
 
 
 def main() -> int:
-    runner = BenchmarkRunner(LocalExecutor(), default_catalog())
+    # `--real` mede o modelo de verdade (chama /v1); senão usa LocalExecutor
+    use_real = "--real" in sys.argv[1:]
+    executor = (LlamaExecutor() if use_real else LocalExecutor())
+    runner = BenchmarkRunner(executor, default_catalog())
     results = runner.run_all()
     report = BenchmarkReport(TaskStore())
     summary = report.save(report.summarize(results))
