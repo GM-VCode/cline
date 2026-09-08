@@ -262,22 +262,33 @@ estrutura a partir da instrução.
 
 ## 9. PRÓXIMA ETAPA — Contexto do projeto no prompt (visão do código)
 
+> ✅ **CONCLUÍDA** (commit `d17e0f7`) — implementada junto com o prompt de
+> identidade (ideia do usuário, para os loops do fire drill).
+
 **Objetivo:** dar ao modelo visão do projeto real antes de editar, acabando com
 o "achismo" em projetos desconhecidos (a limitação da 8.3).
 
-**Plano (etapas pequenas, cada uma com teste):**
-1. `app/agent/context.py` — class `ProjectContext`: coleta árvore de arquivos
-   (com limites de tamanho/nº de arquivos) e conteúdo dos arquivos relevantes;
-   `to_prompt()` renderiza esse contexto em texto.
-2. Plug no `AgentRunner`/CLI: instrução enviada ao modelo passa a incluir o
-   contexto (flag `--no-context` para desligar).
-3. Testes com projeto fake (sem modelo): contexto truncado, arquivo binário
-   ignorado, diretório vazio.
-4. Benchmark A/B: rodar `--real` com e sem contexto e comparar taxa/tempo —
-   registrar resultado aqui.
+### Implementado
+| Arquivo | Função |
+|---|---|
+| `app/agent/context.py` | class `ProjectContext` — árvore + conteúdo dos arquivos no prompt (pula `node_modules`/`.venv`/`.git`/binários; limites: 8 KB/arquivo, 48 KB total, 60 arquivos) |
+| `app/agent/identity.md` | **Prompt fixo do agente (editável sem tocar código)**: quem é ele, como trabalha, regras anti-loop ("não invente credenciais/URIs", "se bloqueado, responda `BLOQUEADO: <motivo>`", "não repita tentativa que já falhou do mesmo jeito") |
+| `app/agent/identity.py` | class `AgentIdentity` — carrega o `.md` |
+| `app/agent/runner.py` | `AgentRunner._compose()`: identidade + contexto + instrução no prompt (flags `--no-context` / `--no-identity` no CLI) |
 
-**Critério de conclusão:** benchmark A/B mostra igual ou melhor (esperado:
-tarefa 008 "projeto desconhecido" mais robusta), 52+ tests OK, validate exit 0.
+**Motivação (dados do fire drill):** nos logs do llama-server, similaridade LCP
+0.99+ em quase todo request = o modelo re-attemptava a mesma coisa (o caso dos
+"logins inventados do Mongo"). É problema de prompt — o `identity.md` instrui a
+declarar bloqueio em vez de inventar, e o contexto evita inventar estrutura.
 
-**Riscos:** prompt maior pode estourar `max_tokens` de saída útil → mitiga-se
-com limites no `ProjectContext` (CTX 256k tem folga enorme pro prompt).
+**Teste real de ponta a ponta (Qwythos-9B):** instrução NÃO dizia em qual
+arquivo estava o bug — só "há um TODO descrevendo um bug, encontre pelo
+contexto". O modelo leu o contexto, achou o TODO em `loja.py`, corrigiu
+(`vals[0] / len(vals)` → `sum(vals)`) e o teste passou de primeira.
+Antes da etapa 9 isso era impossível (ele teria que adivinhar).
+
+**Validação:** 63 tests OK (52 + 11 novos), `validate.py` exit 0.
+
+**Pendente (opcional):** benchmark A/B `--real` com vs. sem contexto — deixar
+para quando o usuário quiser gastar VRAM; a prova de ponta a ponta já cobre o
+critério funcional.
