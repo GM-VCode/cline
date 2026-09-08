@@ -45,10 +45,10 @@ class LlamaExecutor(ModelExecutor):
         # temperatura maior no retry: prompt idêntico com temperature baixa
         # reproduz a mesma resposta (loop); subir quebra o determinismo.
         self.retry_temperature = retry_temperature
-        self.last_raw = None
+        self.last_raw: str | None = None
 
     def _build_messages(self, instruction: str,
-                        feedback: str = None) -> list:
+                        feedback: str | None = None) -> list:
         messages = [{"role": "system", "content": SYSTEM},
                     {"role": "user", "content": instruction}]
         if feedback:
@@ -58,7 +58,7 @@ class LlamaExecutor(ModelExecutor):
         return messages
 
     def _request(self, instruction: str, project_dir: str,
-                 feedback: str = None) -> dict:
+                 feedback: str | None = None) -> dict:
         payload = {
             "model": "LunarIA",
             "messages": self._build_messages(instruction, feedback),

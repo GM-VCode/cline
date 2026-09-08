@@ -37,7 +37,7 @@ class CheckRunner:
 
     @staticmethod
     def feedback_from(instruction: str, output: str,
-                      prev_files: dict = None) -> str:
+                      prev_files: dict | None = None) -> str:
         """Monta o feedback (2.ª tentativa) a partir da falha."""
         parts = [
             "Sua tentativa anterior não passou na verificação.",

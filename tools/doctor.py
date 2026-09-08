@@ -23,9 +23,9 @@ for _stream in (sys.stdout, sys.stderr):
             pass
 
 # doctor.py -> tools/ -> RAIZ (2 dirname)
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-if ROOT not in sys.path:
-    sys.path.insert(0, ROOT)
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from project_path import ProjectPath  # noqa: E402
+ProjectPath.ensure()
 
 from tools.logger import AppLogger  # noqa: E402
 

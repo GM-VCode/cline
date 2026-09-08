@@ -13,7 +13,7 @@ class AttemptCycle:
     """Interpreta UMA resposta do executor e decide o desfecho."""
 
     def __init__(self, checks: CheckRunner, project_dir: str,
-                 check_cmd: list = None):
+                 check_cmd: list | None = None):
         self.checks = checks
         self.project_dir = project_dir
         self.check_cmd = check_cmd or []

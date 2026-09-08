@@ -18,9 +18,12 @@ import subprocess
 import sys
 
 # validate.py -> tools/ -> RAIZ (2 dirname)
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-if ROOT not in sys.path:
-    sys.path.insert(0, ROOT)
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from project_path import ProjectPath  # noqa: E402
+ProjectPath.ensure()
+
+# alias usado por main() (targets de compileall)
+ROOT = ProjectPath.ROOT
 
 
 def _run(cmd: list) -> "tuple[int, str]":

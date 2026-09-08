@@ -12,9 +12,13 @@ import urllib.request
 import urllib.error
 
 # Garante que a raiz do projeto esteja no path (p/ import app.config)
-ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-if ROOT not in sys.path:
-    sys.path.insert(0, ROOT)
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(
+    os.path.abspath(__file__)))))
+from project_path import ProjectPath  # noqa: E402
+ProjectPath.ensure()
+
+# alias de compatibilidade (testes e código antigo usam server.ROOT)
+ROOT = ProjectPath.ROOT
 
 from app.config import Config
 from tools.logger import AppLogger

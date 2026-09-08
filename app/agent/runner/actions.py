@@ -30,7 +30,7 @@ class ActionLoop:
     """Loop ação → observação → próxima ação, com orçamento de passos."""
 
     def __init__(self, executor, checks, project_dir: str,
-                 check_cmd: list = None, max_actions: int = 8):
+                 check_cmd: list | None = None, max_actions: int = 8):
         self.executor = executor
         self.checks = checks
         self.project_dir = project_dir
