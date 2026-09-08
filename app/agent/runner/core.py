@@ -108,6 +108,22 @@ class AgentRunner:
                 "elapsed_s": result.get("elapsed_s"),
                 "error": (result.get("error") or "")[:300],
             })
+            # estado da tarefa (coleção tasks + data/json/task-state.json)
+            self.store.save_state({
+                "objective": instruction[:500],
+                "project": project_dir,
+                "status": "completed" if result.get("finished")
+                          else "failed",
+                "last_result": {
+                    "finished": result.get("finished"),
+                    "attempts": result.get("attempts"),
+                    "retries": result.get("retries"),
+                    "actions_used": result.get("actions_used"),
+                    "files": result.get("files_written", []),
+                    "elapsed_s": result.get("elapsed_s"),
+                    "error": (result.get("error") or "")[:300],
+                },
+            })
         except Exception as exc:  # memória nunca quebra o agente
             log = get_agent_logger()
             if log:

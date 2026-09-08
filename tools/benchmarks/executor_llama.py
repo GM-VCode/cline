@@ -90,11 +90,16 @@ class LlamaExecutor(ModelExecutor):
         """Extrai (files, edits, run_cmd, action) do JSON do modelo."""
         content = content.strip()
         # robustez: extraer el sub-bloco JSON de files si viene suelto
+        start = content.find("{")
+        end = content.rfind("}")
+        if start == -1:
+            return {}, [], None, None
+        blob = content[start:end + 1] if end > start else content[start:]
         try:
-            start = content.find("{")
-            end = content.rfind("}")
-            obj = json.loads(content[start:end + 1])
+            obj = json.loads(blob)
         except (ValueError, json.JSONDecodeError):
+            obj = self._repair_json(blob)
+        if not isinstance(obj, dict):
             return {}, [], None, None
         files = obj.get("files", {})
         if not isinstance(files, dict):
@@ -107,6 +112,40 @@ class LlamaExecutor(ModelExecutor):
         return (files, edits,
                 run_cmd if isinstance(run_cmd, str) else None,
                 action if isinstance(action, str) else None)
+
+    @staticmethod
+    def _repair_json(blob: str):
+        """Tenta fechar JSON truncado (aspas/chaves/colchetes abertos)."""
+        stack = []
+        in_str = False
+        esc = False
+        for ch in blob:
+            if in_str:
+                if esc:
+                    esc = False
+                elif ch == "\\":
+                    esc = True
+                elif ch == '"':
+                    in_str = False
+                continue
+            if ch == '"':
+                in_str = True
+            elif ch in "{[":
+                stack.append(ch)
+            elif ch in "}]":
+                if stack:
+                    stack.pop()
+        fixed = blob
+        if esc:
+            fixed += '"'
+        if in_str:
+            fixed += '"'
+        for ch in reversed(stack):
+            fixed += "}" if ch == "{" else "]"
+        try:
+            return json.loads(fixed)
+        except (ValueError, json.JSONDecodeError):
+            return None
 
     def _apply_files(self, files: dict, project_dir: str):
         for rel, body in files.items():
