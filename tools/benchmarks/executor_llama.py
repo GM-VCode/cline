@@ -17,9 +17,14 @@ SYSTEM = (
     "Você é um engenheiro de software cuidadoso. Dada uma tarefa que cria "
     "ou corrige código, responda EXCLUSIVAMENTE com um bloco JSON: "
     "{\"files\": {\"<relative_path>\": \"<conteúdo do arquivo>\"}, "
+    "\"edits\": [{\"file\": \"<path>\", \"find\": \"<trecho exato e único>\", "
+    "\"replace\": \"<substituição>\"}], "
     "\"run\": \"<comando opcional para você mesmo validar o resultado>\", "
     "\"note\": \"<breve resumo>\"} "
-    "Não escreva nada além do JSON. Cree só os arquivos necessários. "
+    "Para CRIAR arquivo, use 'files' (conteúdo completo). Para MODIFICAR "
+    "arquivo existente, prefira 'edits': o 'find' deve ser um trecho que "
+    "ocorre EXATAMENTE UMA vez no arquivo (copie-o fielmente, com "
+    "indentação). Todos os campos são opcionais, exceto um deles. "
     "Se incluir \"run\", ele será executado no projeto e a saída te será "
     "devolvida se falhar — use para testar seu próprio código antes de "
     "declarar que terminou."
@@ -81,7 +86,7 @@ class LlamaExecutor(ModelExecutor):
         return content
 
     def _parse_files(self, content: str) -> tuple:
-        """Extrai (files, run_cmd) do JSON que o modelo devolve."""
+        """Extrai (files, edits, run_cmd) do JSON que o modelo devolve."""
         content = content.strip()
         # robustez: extraer el sub-bloco JSON de files si viene suelto
         try:
@@ -89,12 +94,15 @@ class LlamaExecutor(ModelExecutor):
             end = content.rfind("}")
             obj = json.loads(content[start:end + 1])
         except (ValueError, json.JSONDecodeError):
-            return {}, None
+            return {}, [], None
         files = obj.get("files", {})
-        run_cmd = obj.get("run")
         if not isinstance(files, dict):
             files = {}
-        return files, (run_cmd if isinstance(run_cmd, str) else None)
+        edits = obj.get("edits", [])
+        if not isinstance(edits, list):
+            edits = []
+        run_cmd = obj.get("run")
+        return files, edits, (run_cmd if isinstance(run_cmd, str) else None)
 
     def _apply_files(self, files: dict, project_dir: str):
         for rel, body in files.items():
@@ -119,20 +127,34 @@ class LlamaExecutor(ModelExecutor):
         resp = self._request(instruction, project_dir, feedback=feedback)
         self.last_raw = resp
         content = self._extract_content(resp)
-        files, run_cmd = self._parse_files(content)
+        files, edits, run_cmd = self._parse_files(content)
         self._apply_files(files, project_dir)
+        edit_report = []
+        if edits:
+            from app.agent.apply import PatchApplier
+            ok_edits, edit_report = PatchApplier().apply(project_dir, edits)
+            if not ok_edits:
+                # edit rejeitado: nada foi escrito; devolve como falha
+                return {
+                    "tool_calls": 0, "retries": 0, "tokens": 0,
+                    "files_written": [], "files": {}, "edits_failed": True,
+                    "edit_errors": edit_report, "run": None,
+                    "content_preview": content[:120],
+                }
         if log:
             log.debug(f"RAW_CONTENT ({len(content)}ch): {content[:1500]!r}")
-            log.debug(f"FILES_PARSED: {sorted(files.keys())} RUN: {run_cmd!r}")
+            log.debug(f"FILES_PARSED: {sorted(files.keys())} "
+                      f"EDITS: {len(edits)} RUN: {run_cmd!r}")
 
         usage = resp.get("usage", {})
         return {
-            "tool_calls": len(files),        # nº de arquivos que "escreve"
+            "tool_calls": len(files) + len(edits),
             "retries": 0,
             "tokens": (usage.get("total_tokens", 0)
                        if isinstance(usage, dict) else 0),
             "files_written": sorted(files.keys()),
             "files": files,
+            "edits_applied": edit_report,
             "run": run_cmd,
             "content_preview": content[:120],
         }

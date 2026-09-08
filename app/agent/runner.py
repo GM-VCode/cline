@@ -76,6 +76,17 @@ class AgentRunner:
                         "attempts": attempts, "retries": retries,
                         "elapsed_s": round(time.time() - started, 2)}
             files = response.get("files_written", []) if response else []
+            # 11b: edits rejeitados (find não bateu) → feedback direto
+            if response and response.get("edits_failed"):
+                ok = False
+                output = ("Suas edições foram REJEITADAS e nada foi "
+                          "modificado:\n"
+                          + "\n".join(response.get("edit_errors", []))
+                          + "\nCorrija o 'find' (copie o trecho fielmente, "
+                          "com indentação) e reenvie.")
+                if log:
+                    log.debug(f"EDITS_REJEITADOS: {response.get('edit_errors')}")
+                continue
             # 11a: o modelo pode pedir para validar o próprio resultado
             run_cmd = (response or {}).get("run") if response else None
             if run_cmd:

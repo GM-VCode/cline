@@ -368,21 +368,46 @@ run inválido não lança), `validate.py` exit 0.
 acionado só pelo próprio modelo em projeto local — risco equivalente ao
 check externo já existente.
 
-## 12. PRÓXIMA ETAPA — Etapa 11b: patch cirúrgico (`edits`)
+## 12. Etapa 11b — Patch cirúrgico (`edits`) — concluída
 
-**Objetivo:** parar de reescrever arquivos inteiros (risco de destruir código
-em projetos reais grandes, como o fire drill).
+O modelo passou a poder **modificar arquivos sem reescrevê-los**: além de
+`"files"` (criação/escrita completa), o JSON aceita
+`"edits": [{"file", "find", "replace"}]`.
 
-1. `app/agent/apply.py` — class `PatchApplier`: aplica
-   `"edits": [{"file", "find", "replace"}]` sobre arquivos existentes
-   (falha explicitamente se `find` não aparecer exatamente 1x);
-   `"files"` continua aceito (escrita completa).
-2. Sistema do executor documenta os dois formatos.
-3. Tests fake: patch ok, find ambíguo/faltando, arquivo novo via `files`.
-4. Prova real com o modelo (descer/subir antes).
+**Segurança (`app/agent/apply.py` — class `PatchApplier`):**
+- `find` deve ocorrer **exatamente 1x** no arquivo: 0x → erro com trecho
+  real do arquivo no feedback; 2x+ → "ambíguo, inclua mais contexto"
+- **Atomicidade**: todos os edits são validados ANTES de qualquer escrita —
+  se um falha, nada é aplicado
+- Caminho fora do projeto e arquivo inexistente (manda usar `files`) rejeitados
+- Se um edit é rejeitado, o runner devolve feedback imediato sem sujar o projeto
 
-**Critério:** 70+ tests OK, validate 0, prova real editando 1 função de um
-arquivo maior sem tocar no resto.
+**Prova real (Qwythos-9B, modelo reiniciado):** projeto com 3 módulos com o
+mesmo bug de juros. Resposta do modelo: `"files": {}` vazio + **3 edits**
+(um por módulo, `find` idêntico e único em cada) + `"run": "python
+test_patch.py"` → `finalizado: True`, 1 tentativa, e o diff confirma que
+**só a linha do juros mudou** em cada arquivo.
 
-**Riscos:** o modelo pode errar o `find` (fallback: feedback com o trecho
-real do arquivo devolve a tentativa pro retry).
+**Validação:** 78 tests OK (70 + 8 novos: patch ok, ambíguo, inexistente,
+fora do projeto, edit malformado, integração bom/rejeitado), validate exit 0.
+
+## 13. PRÓXIMA ETAPA — Etapa 11c: loop iterativo de ferramentas
+
+**Objetivo:** encerrar o modelo de "um palpite por rodada" e chegar ao
+formato real de agente: várias rodadas de ação → observação → decisão,
+como o Cline faz.
+
+1. `AgentRunner` passa a aceitar resposta em passos: o modelo devolve uma
+   AÇÃO por vez (`{"action": "write|edit|run|done", ...}`) e recebe a
+   OBSERVAÇÃO (saída do comando, erro do edit) antes da próxima decisão.
+2. Orçamento de ações por tarefa (`max_actions`, ex. 8) — fecha a pendência
+   antiga de limites duros anti-loop.
+3. Prompt de identidade (`identity.md`) documentando o novo protocolo.
+4. Tests fake: sequência edit→run→done; orçamento estourado; ação inválida.
+5. Prova real em tarefa de 2+ passos (ex.: ler contexto, corrigir, rodar teste).
+
+**Critério:** 78+ tests OK, validate 0, prova real multi-passo sem retried
+cego, RELATORIO atualizado.
+
+**Riscos:** mais rodadas = mais inferência (mitigar com orçamento); modelo
+pode ciclar (mitigar: observação inclui histórico curto de ações já feitas).
