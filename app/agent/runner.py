@@ -11,6 +11,7 @@ import time
 
 from app.agent.checks import CheckRunner
 from app.agent.context import ProjectContext
+from app.agent.debug import get_agent_logger
 
 
 class AgentRunner:
@@ -47,13 +48,18 @@ class AgentRunner:
         started = time.time()
         attempts, retries = 0, 0
         ok, output, files = False, "", []
+        log = get_agent_logger()
         for attempt in range(1, self.max_attempts + 1):
             attempts = attempt
             try:
                 if attempt == 1:
                     response = self.executor.execute(prompt, project_dir)
                 else:
-                    feedback = CheckRunner.feedback_from(instruction, output)
+                    prev_files = (response or {}).get("files", {})
+                    feedback = CheckRunner.feedback_from(
+                        instruction, output, prev_files=prev_files)
+                    if log:
+                        log.debug(f"RETRY {attempt}: feedback={feedback[:400]!r}")
                     response = self.executor.execute_with_feedback(
                         prompt, project_dir, feedback)
                     retries += 1

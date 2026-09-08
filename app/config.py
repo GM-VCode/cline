@@ -80,6 +80,7 @@ class Config:
     LOG_OUT = os.path.join(LOG_DIR, "llama-server.out.log")
     LOG_ERR = os.path.join(LOG_DIR, "llama-server.err.log")
     APP_LOG = os.path.join(LOG_DIR, "app.log")
+    AGENT_LOG = os.path.join(LOG_DIR, "agent.log")  # debug do agente (sempre DEBUG)
 
     # Binário del llama.cpp (global, fora del repo)
     LLAMA_SERVER = r"C:\llama.cpp\llama-server.exe"

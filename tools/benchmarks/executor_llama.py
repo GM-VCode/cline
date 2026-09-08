@@ -10,6 +10,7 @@ import json
 import urllib.request
 
 from tools.benchmarks.runner import ModelExecutor
+from app.agent.debug import get_agent_logger
 
 DEFAULT_URL = "http://127.0.0.1:8080/v1/chat/completions"
 SYSTEM = (
@@ -25,11 +26,15 @@ class LlamaExecutor(ModelExecutor):
     """Executor real via llama-server local."""
 
     def __init__(self, url: str = DEFAULT_URL, temperature: float = 0.2,
-                 max_tokens: int = 2048, enable_thinking: bool = False):
+                 max_tokens: int = 2048, enable_thinking: bool = False,
+                 retry_temperature: float = 0.7):
         self.url = url
         self.temperature = temperature
         self.max_tokens = max_tokens
         self.enable_thinking = enable_thinking
+        # temperatura maior no retry: prompt idêntico com temperature baixa
+        # reproduz a mesma resposta (loop); subir quebra o determinismo.
+        self.retry_temperature = retry_temperature
         self.last_raw = None
 
     def _build_messages(self, instruction: str,
@@ -47,7 +52,8 @@ class LlamaExecutor(ModelExecutor):
         payload = {
             "model": "LunarIA",
             "messages": self._build_messages(instruction, feedback),
-            "temperature": self.temperature,
+            "temperature": (self.retry_temperature if feedback
+                            else self.temperature),
             "max_tokens": self.max_tokens,
             # Qwythos-9B: modelo de raciocínio; desliga o <think>...</think>
             "chat_template_kwargs": {"enable_thinking": self.enable_thinking},
@@ -99,11 +105,18 @@ class LlamaExecutor(ModelExecutor):
 
     def _run(self, instruction: str, project_dir: str,
              feedback: str = None) -> dict:
+        log = get_agent_logger()
+        if log:
+            log.debug(
+                f"REQUEST instr={len(instruction)}ch feedback={'sim' if feedback else 'nao'}")
         resp = self._request(instruction, project_dir, feedback=feedback)
         self.last_raw = resp
         content = self._extract_content(resp)
         files = self._parse_files(content)
         self._apply_files(files, project_dir)
+        if log:
+            log.debug(f"RAW_CONTENT ({len(content)}ch): {content[:1500]!r}")
+            log.debug(f"FILES_PARSED: {sorted(files.keys())}")
 
         usage = resp.get("usage", {})
         return {
@@ -112,5 +125,6 @@ class LlamaExecutor(ModelExecutor):
             "tokens": (usage.get("total_tokens", 0)
                        if isinstance(usage, dict) else 0),
             "files_written": sorted(files.keys()),
+            "files": files,
             "content_preview": content[:120],
         }

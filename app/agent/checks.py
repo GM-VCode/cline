@@ -25,12 +25,25 @@ class CheckRunner:
             return False, f"erro ao executar check: {exc}"
 
     @staticmethod
-    def feedback_from(instruction: str, output: str) -> str:
+    def feedback_from(instruction: str, output: str,
+                      prev_files: dict = None) -> str:
         """Monta o feedback (2.ª tentativa) a partir da falha."""
-        return (
-            "Sua tentativa anterior não passou na verificação.\n"
-            f"Instrução original: {instruction}\n"
-            f"Saída da verificação:\n{output[:2000]}\n"
+        parts = [
+            "Sua tentativa anterior não passou na verificação.",
+            f"Instrução original: {instruction}",
+            f"Saída da verificação:\n{output[:2000]}",
+        ]
+        if prev_files:
+            written = "\n\n".join(
+                f"--- {name} ---\n{body[:1500]}"
+                for name, body in sorted(prev_files.items()))
+            parts.append(
+                "O conteúdo que você efetivamente escreveu foi:\n"
+                f"{written}\n"
+                "IMPORTANTE: a correção precisa estar DENTRO do conteúdo "
+                "dos arquivos no JSON (ex.: imports faltando no topo do "
+                "arquivo). Dizer que corrigiu na nota não aplica nada.")
+        parts.append(
             "Corrija os problemas e reenvie o JSON completo dos arquivos "
-            "necessários."
-        )
+            "necessários.")
+        return "\n\n".join(parts)
