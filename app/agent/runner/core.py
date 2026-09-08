@@ -1,17 +1,17 @@
 # ============================================================
-#  app/agent/runner.py — class AgentRunner
-#  Núcleo do agente REAL (fora do benchmark): instrução +
-#  projeto + comando de verificação. Aplica os arquivos que o
-#  modelo gerar, valida, e em caso de falha reenvia com o
-#  feedback do erro (retry), até max_attempts.
+#  app/agent/runner/core.py — class AgentRunner
+#  Fachada pública: orquestra composição do prompt, ciclos de
+#  tentativa e registro na memória. A lógica de UMA resposta
+#  vive em AttemptCycle (cycle.py); o prompt em PromptComposer.
 # ============================================================
 
 import os
 import time
 
 from app.agent.checks import CheckRunner
-from app.agent.context import ProjectContext
 from app.agent.debug import get_agent_logger
+from app.agent.runner.compose import PromptComposer
+from app.agent.runner.cycle import AttemptCycle
 
 
 class AgentRunner:
@@ -24,20 +24,9 @@ class AgentRunner:
         self.check_cmd = check_cmd or []
         self.max_attempts = max(1, max_attempts)
         self.checks = CheckRunner(timeout=check_timeout)
-        self.use_context = use_context
-        self.identity = identity
+        self.composer = PromptComposer(use_context=use_context,
+                                       identity=identity)
         self.store = store  # TaskStore opcional: registra cada execução
-
-    def _compose(self, instruction: str, project_dir: str) -> str:
-        parts = []
-        if self.identity:
-            ident = self.identity.to_prompt()
-            if ident:
-                parts.append(ident)
-        if self.use_context:
-            parts.append(ProjectContext(project_dir).to_prompt())
-        parts.append(f"INSTRUÇÃO: {instruction}")
-        return "\n\n".join(parts)
 
     def run(self, instruction: str, project_dir: str) -> dict:
         """Ciclo completo + registro na memória (se store configurado)."""
@@ -46,17 +35,18 @@ class AgentRunner:
         return result
 
     def _run_cycle(self, instruction: str, project_dir: str) -> dict:
-        """Ciclo completo: modelo -> aplica -> verifica -> retry."""
+        """Ciclo: modelo -> aplica -> verifica -> retry (até max_attempts)."""
         if not os.path.isdir(project_dir):
             return {"finished": False, "error": "projeto não existe",
                     "attempts": 0, "retries": 0}
-        prompt = self._compose(instruction, project_dir)
+        prompt = self.composer.compose(instruction, project_dir)
 
         started = time.time()
         attempts, retries = 0, 0
         ok, output, files = False, "", []
         internal_runs = 0
         log = get_agent_logger()
+        cycle = AttemptCycle(self.checks, project_dir, self.check_cmd)
         for attempt in range(1, self.max_attempts + 1):
             attempts = attempt
             try:
@@ -76,31 +66,7 @@ class AgentRunner:
                         "attempts": attempts, "retries": retries,
                         "elapsed_s": round(time.time() - started, 2)}
             files = response.get("files_written", []) if response else []
-            # 11b: edits rejeitados (find não bateu) → feedback direto
-            if response and response.get("edits_failed"):
-                ok = False
-                output = ("Suas edições foram REJEITADAS e nada foi "
-                          "modificado:\n"
-                          + "\n".join(response.get("edit_errors", []))
-                          + "\nCorrija o 'find' (copie o trecho fielmente, "
-                          "com indentação) e reenvie.")
-                if log:
-                    log.debug(f"EDITS_REJEITADOS: {response.get('edit_errors')}")
-                continue
-            # 11a: o modelo pode pedir para validar o próprio resultado
-            run_cmd = (response or {}).get("run") if response else None
-            if run_cmd:
-                internal_runs += 1
-                if log:
-                    log.debug(f"RUN interno: {run_cmd!r}")
-                run_ok, run_out = self.checks.run_shell(run_cmd, project_dir)
-                if not run_ok:
-                    # falhou o próprio teste do modelo -> feedback direto
-                    ok, output = False, (
-                        f"O comando que você pediu para executar falhou:\n"
-                        f"$ {run_cmd}\n{run_out[:1500]}")
-                    continue
-            ok, output = self._check(project_dir)
+            ok, output = cycle.settle(response)
             if ok:
                 break
 
@@ -109,7 +75,7 @@ class AgentRunner:
             "error": None if ok else output[:500],
             "attempts": attempts,
             "retries": retries,
-            "internal_runs": internal_runs,
+            "internal_runs": cycle.internal_runs,
             "files_written": files,
             "check_output": output[:2000],
             "elapsed_s": round(time.time() - started, 2),
@@ -135,8 +101,3 @@ class AgentRunner:
             log = get_agent_logger()
             if log:
                 log.warn(f"falha ao registrar execução: {exc}")
-
-    def _check(self, project_dir: str) -> tuple:
-        if not self.check_cmd:
-            return True, "sem comando de verificação configurado"
-        return self.checks.run(self.check_cmd, project_dir)
