@@ -1,82 +1,77 @@
-# 🗂️ Estado estructurado da tarefa
+# 🗂️ Estado estruturado da tarefa
 
-Durante qualquer tarefa de código, o agente mantiene memória estruturada no
-arquivo `data/json/task-state.json`. Se atualiza ao **inicio de cada etapa** e
-**al concluí-la**.
+Durante qualquer tarefa de código, o agente mantém uma memória estruturada no arquivo `data/json/task-state.json`. Ela é atualizada no **início de cada etapa** e **ao concluí-la**.
 
 ## Formato
 
 ```json
 {
-  "objective": "objetivo actual de la tarea",
+  "objective": "objetivo atual da tarefa",
   "plan": [
     {
       "id": "step-1",
-      "description": "descripción breve",
+      "description": "descrição breve",
       "status": "pending | in_progress | completed | blocked",
-      "files": ["archivos que tocará"],
-      "tests": ["comandos para validarla"],
+      "files": ["arquivos que serão modificados"],
+      "tests": ["comandos para validá-la"],
       "notes": "notas / resultado"
     }
   ],
-  "files_read": ["archivos leídos"],
-  "files_changed": ["archivos modificados/creados"],
+  "files_read": ["arquivos lidos"],
+  "files_changed": ["arquivos modificados/criados"],
   "tests_run": ["comando → resultado"],
-  "known_failures": ["fallas aún sin resolver y su explicación"],
-  "decisions": ["decisiones importantes y su motivo"],
-  "next_action": "próximo paso concreto"
+  "known_failures": ["falhas ainda não resolvidas e sua explicação"],
+  "decisions": ["decisões importantes e seu motivo"],
+  "next_action": "próximo passo concreto"
 }
 ```
 
-## Reglas de uso
+## Regras de uso
 
-1. **`files_changed`** debe reflejar lo que realmente mutó el disco
-   (pásalo a `git status`), no lo que "se tenía idea" de modificar.
-2. **`known_failures`**: si hay un test rojo o un error sin resolver, DEBE estar
-   aquí con explicación y `next_action`. No concluyas con fallas mudas.
-3. **`tests_run`**: registra el comando y el resultado (p. ej. `exit 0`,
-   `17 passed`, `1 failed`). No escribas resultados que no se ejecutaron.
-4. Si no es apropiado guardar el archivo en disco (p. ej. tarea efímera),
-   mantén la misma estructura en el contexto de la conversación.
-5. Al terminar, este archivo se considera "prueba" del proceso: plan → edición →
-   validación → revisión. No lo borres a mitad de tarea.
+1. **`files_changed`** deve refletir o que realmente foi alterado no disco (verifique com `git status`), não aquilo que você “pretendia” modificar.
 
-## Persistência em MongoDB (memoria do modelo)
+1. **`known_failures`**: se houver um teste falhando ou um erro não resolvido, ele DEVE estar aqui com a explicação e o `next_action`. Não conclua a tarefa com falhas silenciosas.
 
-O estado e o histórico de validações se guardam também no seu **MongoDB local**
-(com fallback automático a JSON se Mongo não está disponível).
+1. **`tests_run`**: registre o comando e o resultado (por exemplo, `exit 0`, `17 passed`, `1 failed`). Não escreva resultados que não foram executados.
 
-**Base/coleções:** `cline_agent` → `tasks` (estado) e `validations` (histórico).
+1. Se não for apropriado salvar o arquivo no disco (por exemplo, em uma tarefa efêmera), mantenha a mesma estrutura no contexto da conversa.
 
-**Conexión:** por padrão `mongodb://localhost:27017/`. Se sobreescribe com
-`MONGODB_URI`, `MONGODB_DB` e `TASK_ID` no `.env` ou variáveis de ambiente.
+1. Ao terminar, este arquivo é considerado uma “prova” do processo: plano → edição → validação → revisão. Não o apague no meio da tarefa.
+
+## Persistência no MongoDB (memória do modelo)
+
+O estado e o histórico das validações também são armazenados no seu **MongoDB local** (com fallback automático para JSON se o Mongo não estiver disponível).
+
+**Banco/coleções:** `cline_agent` → `tasks` (estado) e `validations` (histórico).
+
+**Conexão:** por padrão, `mongodb://localhost:27017/`. É substituída por `MONGODB_URI`, `MONGODB_DB` e `TASK_ID` no `.env` ou nas variáveis de ambiente.
 
 **Uso:**
+
 ```bash
 .venv\Scripts\python.exe data\mongodb\scripts\init_mongo.py   # cria coleções/índices
 .venv\Scripts\python.exe data\mongodb\scripts\memory.py state           # ver estado atual
-.venv\Scripts\python.exe data\mongodb\scripts\memory.py validations 20  # historial
+.venv\Scripts\python.exe data\mongodb\scripts\memory.py validations 20  # histórico
 ```
 
-`tools/validate.py` registra cada corrida em `validations` automaticamente. Os tests
-de `TaskStore` usam **fallback JSON** com paths temporales (não tocam o seu Mongo).
+`tools/validate.py` registra cada execução em `validations` automaticamente. Os testes de `TaskStore` usam **fallback JSON** com caminhos temporários (não tocam no seu MongoDB).
 
 ---
 
 ```json
 {
-  "objective": "Corregir el bug X en server.py",
+  "objective": "Corrigir o bug X em server.py",
   "plan": [
-    { "id": "step-1", "description": "reproducir la falla con un test",
-      "status": "completed", "files": ["tests/test_server.py"], "tests": ["unittest -v"], "notes": "test rojo reprodujo el bug" },
-    { "id": "step-2", "description": "corregir la causa en server.py",
+    { "id": "step-1", "description": "reproduzir a falha com um teste",
+      "status": "completed", "files": ["tests/test_server.py"], "tests": ["unittest -v"], "notes": "teste com falha reproduziu o bug" },
+    { "id": "step-2", "description": "corrigir a causa em server.py",
       "status": "in_progress", "files": ["app/server.py"], "tests": ["unittest -v", "validate.py"], "notes": "" }
   ],
   "files_read": ["app/server.py", "app/config.py"],
   "files_changed": ["tests/test_server.py"],
-  "tests_run": ["python -m unittest discover -s tests -v → 1 fallo reproducido"],
+  "tests_run": ["python -m unittest discover -s tests -v → 1 falha reproduzida"],
   "known_failures": [],
-  "decisions": ["No cambiar la firma pública de validate()"],
-  "next_action": "editar app/server.py y re-ejecutar validate.py"
+  "decisions": ["Não alterar a assinatura pública de validate()"],
+  "next_action": "editar app/server.py e executar validate.py novamente"
 }
 ```

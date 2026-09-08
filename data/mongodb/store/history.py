@@ -24,7 +24,10 @@ class HistoryCollection:
 
     @property
     def _coll(self):
-        return self.conn.collection(self.coll_name) if self.conn else None
+        """Coleção Mongo ativa (None se sem conexão ou Mongo off)."""
+        if self.conn is not None and self.conn.active:
+            return self.conn.collection(self.coll_name)
+        return None
 
     def append(self, entry: dict, task_id: str | None = None) -> dict:
         if not isinstance(entry, dict):
@@ -32,9 +35,10 @@ class HistoryCollection:
         entry = dict(entry)
         entry.setdefault("task_id", task_id or self.task_id)
         entry.setdefault("ts", time.strftime("%Y-%m-%dT%H:%M:%S"))
-        if self.conn and self.conn.active:
+        coll = self._coll
+        if coll is not None:
             try:
-                self._coll.insert_one(dict(entry))
+                coll.insert_one(dict(entry))
                 self.last_backend = "mongo"
                 return entry
             except Exception as exc:  # pragma: no cover
@@ -43,9 +47,10 @@ class HistoryCollection:
 
     def list(self, limit: int = 20, task_id: str | None = None) -> list:
         tid = task_id or self.task_id
-        if self.conn and self.conn.active:
+        coll = self._coll
+        if coll is not None:
             try:
-                cursor = (self._coll.find({"task_id": tid})
+                cursor = (coll.find({"task_id": tid})
                           .sort("_id", -1).limit(limit))
                 out = [{k: v for k, v in doc.items() if k != "_id"}
                        for doc in cursor]

@@ -6,10 +6,7 @@
 
 import os
 
-try:
-    from app.config import Config as _Config
-except ImportError:  # pragma: no cover
-    _Config = None
+from project_path import Config as _Config
 
 DEFAULT_URI = "mongodb://localhost:27017/"
 DEFAULT_DB = "cline_agent"
@@ -39,7 +36,7 @@ class RuntimePaths:
             os.path.abspath(__file__)))))
 
     @staticmethod
-    def _load_env() -> dict:
+    def _load_env() -> dict[str, str]:
         try:
             return _Config._load_dotenv(
                 os.path.join(RuntimePaths._project_root(), ".env"))

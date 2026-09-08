@@ -6,16 +6,21 @@
 
 import threading
 from http.server import ThreadingHTTPServer
+from typing import TYPE_CHECKING
 
 from app.services.proxy.handler import ProxyHandler
 from app.services.proxy.sessions import SessionRegistry
+
+if TYPE_CHECKING:  # anotação só para o editor (não roda em runtime)
+    from app.task_store import TaskStore
 
 
 class ProxyServer:
     """Proxy HTTP (threaded) entre o Cline e o llama-server."""
 
     def __init__(self, host: str = "127.0.0.1", port: int = 8081,
-                 upstream: str = "http://127.0.0.1:8080", store=None):
+                 upstream: str = "http://127.0.0.1:8080",
+                 store: "TaskStore | None" = None) -> None:
         self.host = host
         self.port = port
         self.upstream = upstream

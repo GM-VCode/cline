@@ -65,7 +65,7 @@ voltar ao modo direto (sem registro).
 
 ```
                         ┌─────────────────────────────┐
-   suas configs         │      app/config.py          │
+   suas configs         │     project_path.py         │
   ┌──────────┐  lê     │  class Config               │
   │  .env    ├────────>│  (defaults + .env)          │
   └──────────┘         └──────────────┬──────────────┘
@@ -89,10 +89,11 @@ voltar ao modo direto (sem registro).
 ```
 
 **Fluxo em palavras:** você configura no `.env` (raiz) → a classe `Config`
-(`app/config.py`) lê o `.env` (o que não estiver lá, usa o default da própria
-classe) → a classe `LlamaServer` (`app/services/server.py`) valida e inicia o
-`llama-server.exe` → `main.py` é só o ponto de entrada central:
-`LlamaServer(Config()).run()`.
+(`project_path.py` — fonte única de caminhos + config; `app/config.py` só
+re-exporta por compatibilidade) lê o `.env` (o que não estiver lá, usa o
+default do `__init__`) → a classe `LlamaServer` (`app/services/server.py`)
+valida e inicia o `llama-server.exe` → `main.py` é só o ponto de entrada
+central: `LlamaServer(Config()).run()`.
 
 ---
 
@@ -102,6 +103,8 @@ classe) → a classe `LlamaServer` (`app/services/server.py`) valida e inicia o
 LunarIA/
 │
 ├── 🚀 main.py                    ← PONTO DE ENTRADA central (só carrega, sem lógica)
+├── 🧭 project_path.py            ← FONTE ÚNICA: class ProjectPath (raiz/sys.path)
+│                                    + class Config (defaults + leitura do .env)
 ├── 📦 tools/                     ← ★ ferramentas que rodam separadas do modelo
 │   ├── __init__.py
 │   ├── validate.py               ← GATE de validação (compileall + unittest + diff)
@@ -109,7 +112,7 @@ LunarIA/
 │   └── logger.py                 ← class AppLogger (logging com níveis → logs/)
 ├── 📦 app/                       ← código do projeto (pacote Python)
 │   ├── __init__.py               ← API pública (Config, LlamaServer, TaskStore)
-│   ├── config.py                 ← class Config: defaults + leitura do .env
+│   ├── config.py                 ← re-export fino de Config (compatibilidade)
 │   ├── task_store.py             ← re-export TaskStore (compatibilidade)
 │   └── services/                 ← ★ servicios (cada um com sua classe)
 │       ├── __init__.py

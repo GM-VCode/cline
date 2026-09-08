@@ -6,15 +6,14 @@
 
 import os
 import shutil
-import sys
 import tempfile
-import types
 import unittest
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-if ROOT not in sys.path:
-    sys.path.insert(0, ROOT)
+from project_path import ProjectPath  # noqa: E402
+ProjectPath.ensure()
+ROOT = ProjectPath.ROOT
 
+from project_path import Config  # noqa: E402
 from tools.doctor import ModelDoctor  # noqa: E402
 from data.mongodb.store import TaskStore  # noqa: E402
 
@@ -28,15 +27,20 @@ def fake_cfg(log_dir, model_ok=True):
     if model_ok:
         with open(server, "w", encoding="utf-8") as f:
             f.write("x")
-    return types.SimpleNamespace(
-        LLAMA_SERVER=server, MODEL_PATH=model,
-        MM_PROJ_ENABLED=False, MM_PROJ_PATH="",
-        CTX=409600, LOG_LEVEL="INFO",
-        LOG_DIR=log_dir, APP_LOG=os.path.join(log_dir, "app.log"),
-        LOG_OUT=os.path.join(log_dir, "out.log"),
-        LOG_ERR=os.path.join(log_dir, "err.log"),
-        HOST="127.0.0.1", PORT=59999,  # porta fechada -> warn
-    )
+    cfg = Config()
+    cfg.LLAMA_SERVER = server
+    cfg.MODEL_PATH = model
+    cfg.MM_PROJ_ENABLED = False
+    cfg.MM_PROJ_PATH = ""
+    cfg.CTX = 409600
+    cfg.LOG_LEVEL = "INFO"
+    cfg.LOG_DIR = log_dir
+    cfg.APP_LOG = os.path.join(log_dir, "app.log")
+    cfg.LOG_OUT = os.path.join(log_dir, "out.log")
+    cfg.LOG_ERR = os.path.join(log_dir, "err.log")
+    cfg.HOST = "127.0.0.1"
+    cfg.PORT = 59999  # porta fechada -> warn
+    return cfg
 
 
 def fake_store(d):

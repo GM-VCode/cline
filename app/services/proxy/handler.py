@@ -31,10 +31,10 @@ class ProxyHandler(BaseHTTPRequestHandler):
     UPSTREAM_TIMEOUT = 600  # geração longa não pode estourar cedo
 
     # ---------- infra ----------
-    def log_message(self, fmt, *args):
+    def log_message(self, format: str, *args) -> None:  # assinatura stdlib
         log = get_agent_logger()
         if log:
-            log.debug("proxy: " + (fmt % args))
+            log.debug("proxy: " + (format % args))
 
     def _send_json(self, code: int, obj: dict):
         data = json.dumps(obj, ensure_ascii=False).encode("utf-8")
@@ -45,7 +45,7 @@ class ProxyHandler(BaseHTTPRequestHandler):
         self.wfile.write(data)
 
     # ---------- relay ----------
-    def _relay_upstream(self, raw: bytes = None) -> None:
+    def _relay_upstream(self, raw: bytes | None = None) -> None:
         """Repassa ao llama-server e devolve o corpo ao Cline.
         HTTPError (4xx/5xx) é repassado como veio, sem virar 502."""
         headers = {k: v for k, v in self.headers.items()

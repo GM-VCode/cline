@@ -1,22 +1,2 @@
-# ============================================================
-#  requirements.txt - Dependencias do projeto LunarIA/Qwythos-9B
-# ============================================================
-#
-# Este projeto usa APENAS a biblioteca padrao do Python (stdlib):
-#   - os, sys, time, subprocess, urllib  (main.py)
-#
-# Nao ha pacotes externos obrigatorios. O arquivo existe para:
-#   1) Documentar essa decisao;
-#   2) Se voce quiser adicionar dependencias no futuro, basta
-#      lista-las abaixo e rodar:
-#        .venv\Scripts\pip install -r requirements.txt
-# ============================================================
-
-# ------------------------------------------------------------
-# Dependencia OPCIONAL (para a memória/agente via MongoDB):
-#   - pymongo  (app/task_store.py)  -> persistencia en MongoDB local
-#     Instalar:  .venv\Scripts\pip install pymongo
-# Si pymongo no está o MongoDB no está disponible, el flujo
-# sigue funcionando en modo JSON puro (fallback automático).
-# ------------------------------------------------------------
-pymongo>=4.0  # opcional: memoria do agente (MongoDB local)
+pymongo 4.18.0
+python-dotenv>=1.0,<2

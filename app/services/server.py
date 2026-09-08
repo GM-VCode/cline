@@ -11,23 +11,17 @@ import subprocess
 import urllib.request
 import urllib.error
 
-# Garante que a raiz do projeto esteja no path (p/ import app.config)
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(
-    os.path.abspath(__file__)))))
-from project_path import ProjectPath  # noqa: E402
-ProjectPath.ensure()
+from project_path import Config, ProjectPath
+from tools.logger import AppLogger
 
 # alias de compatibilidade (testes e código antigo usam server.ROOT)
 ROOT = ProjectPath.ROOT
-
-from app.config import Config
-from tools.logger import AppLogger
 
 
 class LlamaServer:
     """Encapsula todo o ciclo de vida do processo llama-server."""
 
-    def __init__(self, config: Config):
+    def __init__(self, config: Config) -> None:
         self.cfg = config
         self.log = AppLogger("server")
 
@@ -59,7 +53,7 @@ class LlamaServer:
             sys.exit(1)
 
     # ---------- argumentos ----------
-    def build_args(self) -> list:
+    def build_args(self) -> list[str]:
         """Monta a lista de argumentos do llama-server a partir da config."""
         c = self.cfg
         args = [
@@ -118,7 +112,7 @@ class LlamaServer:
         return False
 
     # ---------- exibição ----------
-    def show_config(self, args: list) -> None:
+    def show_config(self, args: list[str]) -> None:
         print("=" * 60)
         print("  Qwythos-9B — config efetiva")
         print("=" * 60)

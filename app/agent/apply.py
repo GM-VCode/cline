@@ -13,7 +13,8 @@ import os
 class PatchApplier:
     """Aplica edições de trecho em arquivos de projeto, com atomicidade."""
 
-    def apply(self, project_dir: str, edits) -> tuple:
+    def apply(self, project_dir: str,
+              edits: list) -> tuple[bool, list[str]]:
         """Aplica uma lista de edits. Retorna (ok: bool, report: list[str]).
 
         Todas as edições são validadas ANTES de qualquer escrita: se uma
@@ -39,7 +40,8 @@ class PatchApplier:
             report.append(f"editado: {os.path.relpath(path, project_dir)}")
         return True, report
 
-    def _validate_one(self, project_dir: str, edit, index: int):
+    def _validate_one(self, project_dir: str, edit,
+                      index: int) -> str | tuple[str, str, str]:
         """Valida um edit; retorna plano (path, find, replace) ou erro str."""
         if not isinstance(edit, dict):
             return f"edit[{index}]: deve ser objeto {{file, find, replace}}"

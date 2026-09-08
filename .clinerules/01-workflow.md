@@ -1,62 +1,56 @@
-# 🧭 Fluxo disciplinado de trabalho (reglas de Cline)
+# 🧭 Fluxo disciplinado de trabalho (regras do Cline)
 
-Estas reglas guiam o comportamento do agente (Cline) quando trabalha sobre
-este repo. Se aplicam a **qualquer** tarefa de código. O objetivo não é generar
-mais código, senão um processo confiable de engenharia.
+Estas regras orientam o comportamento do agente (Cline) quando ele trabalha neste repositório. Elas se aplicam a **qualquer** tarefa de código. O objetivo não é gerar mais código, mas sim estabelecer um processo confiável de engenharia.
 
-## 1. Antes de tocar nada: auditar
+## 1. Antes de tocar em qualquer coisa: auditar
 
-1. Lista a estrutura do projeto (ignora `.git`, `node_modules`, `.venv`,
-   `__pycache__`, `dist`, `build` e binarios grandes).
-2. Leia o README, a config, o entry point e os módulos relacionados.
-3. Revisa o estado de Git (`git status`) e **não pises** cambios do usuário
-   (p. ej. `.env`).
-4. Busca TODOs/FIXME/imports rotos **sólo** para entender; não edites código que
-   não forma parte da tarefa.
+1. Liste a estrutura do projeto (ignore `.git`, `node_modules`, `.venv`, `__pycache__`, `dist`, `build` e binários grandes).
 
-Presenta un plan curto: objetivo, archivos a modificar, archivos que NÃO se
-tocan, riscos, estrategia de tests e critério de conclusión.
+1. Leia o README, a configuração, o ponto de entrada e os módulos relacionados.
+
+1. Revise o estado do Git (`git status`) e **não sobrescreva** as alterações do usuário (por exemplo, `.env`).
+
+1. Procure TODOs/FIXMEs/importações quebradas **somente** para entender o contexto; não edite código que não faça parte da tarefa.
+
+Apresente um plano curto: objetivo, arquivos a modificar, arquivos que **NÃO** serão alterados, riscos, estratégia de testes e critério de conclusão.
 
 ## 2. Dividir em etapas pequenas
 
-- Cada etapa: objetivo específico, archivos, pre-condición, cambio esperado e
-  **su** validación.
-- No implementes um sistema grande de uma vez. Valida cada etapa antes da
-  siguiente.
+- Cada etapa deve ter: objetivo específico, arquivos envolvidos, pré-condição, alteração esperada e **sua** validação.
 
-## 3. Leer antes de editar
+- Não implemente um sistema grande de uma só vez. Valide cada etapa antes da próxima.
 
-- Nunca edites um archivo sin leelo antes (o el fragmento relevante).
-- Antes de crear una función/clase/arg/ruta/variable: busca si ya existe, onde
-  se define e quién la usa. **No inventes nombres** que não estén no proyecto.
-- Preserva la interfaz existente salvo que la tarefa exija camниarla; si cambia,
-  atualiza todos sus consumidores.
+## 3. Ler antes de editar
 
-## 4. Alteraciones pequenas e verificables
+- Nunca edite um arquivo sem tê-lo lido antes (ou pelo menos o trecho relevante).
 
-- Prefer sagura patches pequenos a reescrebir archivos completos.
-- Trás cada edición: confirma éxito, **relee** el archivo, busca duplicados,
-  líneas truncadas e indentación incorrecta.
-- Si la edición falha: no lo finjas. Relee, verifica, reduce el patch o cambia
-  de método, y vuelve a confirmar.
+- Antes de criar uma função/classe/argumento/rota/variável: procure se já existe, onde é definido e quem o utiliza. **Não invente nomes** que não estejam no projeto.
 
-## 5. Estado estructurado da tarefa
+- Preserve a interface existente, a menos que a tarefa exija alterá-la; se ela mudar, atualize todos os seus consumidores.
 
-- Mantén `.task-state.json` (em `data/json/`, ver `02-task-state.md`) e atualícelo em
-  cada etapa: objetivo, plan con status, archivos lidos/cambiados, tests
-  executados, falhas conhecidas, decisiones e próxima acción.
-- **Nunca** declares a tarefa concluida con falhas pendentes sin explicación.
+## 4. Alterações pequenas e verificáveis
 
-## 6. Consistencia entre definições e usos
+- Prefira patches pequenos e seguros a reescrever arquivos completos.
 
-- Verifica: funciones↔chamadas, classes↔imports, args de CLI↔código que los lê,
-  config↔uso, rutas↔consumidores, nomes documentados↔implementados.
-- Busca referências a atributos (`args.input`, `args.url`, `args.config`,
-  `args.patterns`) sin definición en el parser.
+- Após cada edição: confirme o sucesso, **releia** o arquivo, procure duplicações, linhas truncadas e indentação incorreta.
 
-## 7. Testear depois de editar
+- Se a edição falhar: não finja que funcionou. Releia, verifique, reduza o patch ou mude o método e confirme novamente.
 
-Orden de validación:
+## 5. Estado estruturado da tarefa
+
+- Mantenha `.task-state.json` (em `data/json/`, consulte `02-task-state.md`) e atualize-o a cada etapa: objetivo, plano com status, arquivos lidos/alterados, testes executados, falhas conhecidas, decisões e próxima ação.
+
+- **Nunca** declare a tarefa concluída com falhas pendentes sem explicá-las.
+
+## 6. Consistência entre definições e usos
+
+- Verifique: funções↔chamadas, classes↔importações, argumentos da CLI↔código que os lê, configuração↔uso, rotas↔consumidores, nomes documentados↔implementados.
+
+- Procure referências a atributos (`args.input`, `args.url`, `args.config`, `args.patterns`) sem definição no parser.
+
+## 7. Testar depois de editar
+
+Ordem de validação:
 
 ```bash
 python -m compileall -q app data/mongodb main.py tools tests
@@ -65,75 +59,75 @@ python tools/validate.py
 git diff --check
 ```
 
-- Si no hay tests para el comportamento, créalos mínimos (no artificiales).
-- Nunca des por hecho que funciona porque "el código existe".
+- Se não houver testes para o comportamento, crie testes mínimos (não artificiais).
+
+- Nunca presuma que funciona apenas porque “o código existe”.
 
 ## 8. Corrigir erros em loop
 
 ```
-executar → código de salida → mensaje completa → archivo:línea
-→ hipótesis → corrigir causa → re-ejecutar → verificar no-regresión
+executar → código de saída → mensagem completa → arquivo:linha
+→ hipótese → corrigir a causa → executar novamente → verificar a não regressão
 ```
 
-Repite hasta: el test pase, la falha sea comprobadamente externa, ou haya un
-bloqueo real (entonces reporta comando, error, intentos e acción humana
-necesaria).
+Repita até que: o teste passe, a falha seja comprovadamente externa ou exista um bloqueio real. Nesse último caso, informe o comando, o erro, as tentativas realizadas e a ação humana necessária.
 
-## 9. No declarar éxito prematuro
+## 9. Não declarar sucesso prematuramente
 
-No uses "está listo/funcionando/implementado" solo porque los archivos se
-crearon. Antes de concluir: sintaxis, imports, tests, comando principal, diff
-revisado, sin falhas conhecidas, e documentación coerente.
+Não use “está pronto/funcionando/implementado” apenas porque os arquivos foram criados. Antes de concluir: verifique a sintaxe, as importações, os testes, o comando principal e o diff; confirme que não há falhas conhecidas e que a documentação está coerente.
 
 ## 10. Revisar o próprio trabalho (estilo PR)
 
-Bug lógico, casos de error, entradas inválidas, regresiones, imports olvidados,
-archivos que faltaron, cambios innecesarios, código duplicado, seguridad e
-documentación desatualizada. Corrige e re-testea.
+Verifique: bugs lógicos, casos de erro, entradas inválidas, regressões, importações esquecidas, arquivos ausentes, alterações desnecessárias, código duplicado, segurança e documentação desatualizada. Corrija e teste novamente.
 
 ## 11. Contexto inteligente
 
-Prioriza: sistema → objetivo → estructura → archivos relacionados → interfaces →
-cambios recientes → erros de test → pendientes. Preserva objetivo, restricciones,
-decisiones, archivos, tests que falharam e mensajes de error aunque resumas.
+Priorize: sistema → objetivo → estrutura → arquivos relacionados → interfaces → alterações recentes → erros de teste → pendências. Preserve o objetivo, as restrições, as decisões, os arquivos, os testes que falharam e as mensagens de erro, mesmo ao resumir.
 
-## 12. Recuperación de fallas de herramienta
+## 12. Recuperação de falhas de ferramentas
 
-**Leer:** confirma ruta, verifica existencia, reduce el rango, no inventes
-contenido. **Editar:** relee, reduce patch, usa contexto exacto, verifica.
-**Shell:** captura exit code, identifica la shell, adapta la sintaxis.
-**Test:** corrige la causa, no el síntoma; re-ejecuta el test y luego la regresión.
+**Leitura:** confirme o caminho, verifique a existência, reduza o intervalo e não invente conteúdo. **Edição:** releia, reduza o patch, use o contexto exato e verifique. **Shell:** capture o código de saída, identifique o shell e adapte a sintaxe. **Teste:** corrija a causa, não o sintoma; execute novamente o teste e, em seguida, a regressão.
 
-## 13. Seguridad e escopo
+## 13. Segurança e escopo
 
-- No expongas `.env`, tokens, claves ni cookies. No los imprimas.
-- No edites archivos fora do escopo sin justificación.
-- No ejecutes comandos destructivos si hay un equivalente seguro.
-- Antes de algo destructivo o irreversible: **detente e pregunta**.
-- Preserva cambios do usuário (`.env` deste repo está modificado a propósito).
+- Não exponha `.env`, tokens, chaves nem cookies. Não os imprima.
 
-## 14. No inventar requisitos
+- Não edite arquivos fora do escopo sem justificativa.
 
-Alternativa más conservadora y reversible; registra a suposición. No añadas
-dependencias/frameworks/servicios sin necesidad real. No conviertas una tarefa
-pequeña en una reescritura.
+- Não execute comandos destrutivos se houver uma alternativa segura.
+
+- Antes de realizar algo destrutivo ou irreversível: **pare e pergunte**.
+
+- Preserve as alterações do usuário (`.env` deste repositório foi modificado de propósito).
+
+## 14. Não inventar requisitos
+
+Escolha a alternativa mais conservadora e reversível; registre a suposição. Não adicione dependências, frameworks ou serviços sem necessidade real. Não transforme uma tarefa pequena em uma reescrita.
 
 ---
 
-## Critério de aceptação (ponta a ponta)
+## Critério de aceitação (ponta a ponta)
 
-Una tarefa con un bug deve poder ejecutarse así:
+Uma tarefa com um bug deve poder ser executada da seguinte forma:
 
-1. recibir un proyecto pequeño con un bug
-2. localizar los archivos relacionados
-3. explicar el plan
-4. editar **sólo** lo necesario
-5. ejecutar el test existente
-6. interpretar una falha
-7. corrigir el problema
-8. ejecutar el test de novo
-9. revisar el diff
-10. informar el resultado con honestidad
+1. receber um projeto pequeno com um bug;
 
-Si en cualquier momento el `.env`, `models/`, `tools/visao/` ou `bat/` deberían
-cambiarse, **explícalo e pide permiso** antes de hacerlo.
+1. localizar os arquivos relacionados;
+
+1. explicar o plano;
+
+1. editar **somente** o necessário;
+
+1. executar o teste existente;
+
+1. interpretar uma falha;
+
+1. corrigir o problema;
+
+1. executar o teste novamente;
+
+1. revisar o diff;
+
+1. informar o resultado com honestidade.
+
+Se, em algum momento, `.env`, `models/`, `tools/visao/` ou `bat/` precisarem ser alterados, **explique o motivo e peça permissão** antes de fazer isso.

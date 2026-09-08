@@ -30,7 +30,8 @@ class ActionLoop:
     """Loop ação → observação → próxima ação, com orçamento de passos."""
 
     def __init__(self, executor, checks, project_dir: str,
-                 check_cmd: list | None = None, max_actions: int = 8):
+                 check_cmd: list | None = None,
+                 max_actions: int = 8) -> None:
         self.executor = executor
         self.checks = checks
         self.project_dir = project_dir
@@ -126,7 +127,7 @@ class ActionLoop:
             "elapsed_s": round(time.time() - started, 2),
         }
 
-    def _do(self, action: str, response: dict) -> tuple:
+    def _do(self, action: str, response: dict) -> tuple[bool, str]:
         """Executa a ação; retorna (ok, observation)."""
         if action == "write":
             files = response.get("files") or {}
@@ -158,7 +159,7 @@ class ActionLoop:
                         else f"$ {cmd} (sem saída)")
         return False, f"ação não implementada: {action}"
 
-    def _write_files(self, files: dict):
+    def _write_files(self, files: dict) -> None:
         import os
         base = os.path.abspath(self.project_dir)
         for rel, content in files.items():

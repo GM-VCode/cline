@@ -6,19 +6,19 @@
 
 import os
 import shutil
-import sys
 import tempfile
-import types
 import unittest
 
 import app.services.server as server_mod
 from app.services.server import LlamaServer
+from project_path import Config
 
 ROOT = server_mod.ROOT  # raíz del proyecto
 
 
 def make_config(**overrides):
-    """Config falsa con defaults conservadores para build_args/validate."""
+    """Config real com overrides de instância (não toca arquivos reais)."""
+    cfg = Config()
     defaults = dict(
         LLAMA_SERVER=r"C:\llama.cpp\llama-server.exe",
         MODEL_PATH=r"C:\models\fake.gguf",
@@ -41,7 +41,9 @@ def make_config(**overrides):
         SEED=None,
     )
     defaults.update(overrides)
-    return types.SimpleNamespace(**defaults)
+    for key, value in defaults.items():
+        setattr(cfg, key, value)
+    return cfg
 
 
 def write_file(path, content="x"):

@@ -15,11 +15,10 @@ import sys
 
 # Garante que a raiz do projeto esteja no path (p/ importar app.*)
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from project_path import ProjectPath  # noqa: E402
+from project_path import Config, ProjectPath  # noqa: E402
 ProjectPath.ensure()
 
 from app.services.server import LlamaServer  # noqa: E402
-from app.config import Config       # noqa: E402
 
 
 if __name__ == "__main__":

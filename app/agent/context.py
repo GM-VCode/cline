@@ -20,7 +20,7 @@ class ProjectContext:
     """Snapshot textual do projeto para incluir no prompt."""
 
     def __init__(self, project_dir: str, max_files: int = MAX_FILES,
-                 max_total: int = MAX_TOTAL_BYTES):
+                 max_total: int = MAX_TOTAL_BYTES) -> None:
         self.project_dir = project_dir
         self.max_files = max_files
         self.max_total = max_total
@@ -37,7 +37,7 @@ class ProjectContext:
                     continue
                 yield os.path.join(root, name)
 
-    def _collect(self) -> tuple:
+    def _collect(self) -> tuple[list[str], list[str], int]:
         tree, details, budget = [], [], 0
         for path in self._walk_files():
             rel = os.path.relpath(path, self.project_dir).replace("\\", "/")

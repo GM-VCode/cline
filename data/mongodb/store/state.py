@@ -22,7 +22,10 @@ class StateRepo:
 
     @property
     def _coll(self):
-        return self.conn.collection("tasks") if self.conn else None
+        """Coleção Mongo ativa (None se sem conexão ou Mongo off)."""
+        if self.conn is not None and self.conn.active:
+            return self.conn.collection("tasks")
+        return None
 
     def save(self, payload: dict, task_id: str | None = None) -> dict:
         if not isinstance(payload, dict):
@@ -33,10 +36,10 @@ class StateRepo:
         payload.setdefault("updated_at", time.strftime("%Y-%m-%dT%H:%M:%S"))
         # o JSON é sempre um espelho; last_backend indica o primário
         self.last_backend = "json"
-        if self.conn and self.conn.active:
+        coll = self._coll
+        if coll is not None:
             try:
-                self._coll.replace_one({"task_id": tid},
-                                       payload, upsert=True)
+                coll.replace_one({"task_id": tid}, payload, upsert=True)
                 self.last_backend = "mongo"
             except Exception as exc:  # pragma: no cover
                 self.error_sink(f"Falha Mongo (save_state): {exc}")
@@ -45,9 +48,10 @@ class StateRepo:
 
     def load(self, task_id: str | None = None) -> dict:
         tid = task_id or self.task_id
-        if self.conn and self.conn.active:
+        coll = self._coll
+        if coll is not None:
             try:
-                doc = self._coll.find_one({"task_id": tid})
+                doc = coll.find_one({"task_id": tid})
                 if doc:
                     return {k: v for k, v in doc.items() if k != "_id"}
             except Exception as exc:  # pragma: no cover

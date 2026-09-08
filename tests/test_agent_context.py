@@ -9,9 +9,9 @@ import sys
 import tempfile
 import unittest
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-if ROOT not in sys.path:
-    sys.path.insert(0, ROOT)
+from project_path import ProjectPath  # noqa: E402
+ProjectPath.ensure()
+ROOT = ProjectPath.ROOT
 
 from app.agent import AgentIdentity, AgentRunner, ProjectContext  # noqa: E402
 

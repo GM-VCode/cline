@@ -10,10 +10,10 @@ import subprocess
 class CheckRunner:
     """Roda um comando de validação dentro do diretório do projeto."""
 
-    def __init__(self, timeout: int = 120):
+    def __init__(self, timeout: int = 120) -> None:
         self.timeout = timeout
 
-    def run(self, check_cmd: list, project_dir: str) -> tuple:
+    def run(self, check_cmd: list[str], project_dir: str) -> tuple[bool, str]:
         """Retorna (ok: bool, output: str). Nunca lança."""
         try:
             proc = subprocess.run(
@@ -24,7 +24,7 @@ class CheckRunner:
         except (OSError, subprocess.TimeoutExpired, ValueError) as exc:
             return False, f"erro ao executar check: {exc}"
 
-    def run_shell(self, cmd: str, project_dir: str) -> tuple:
+    def run_shell(self, cmd: str, project_dir: str) -> tuple[bool, str]:
         """Executa comando (string, via shell) — p/ 'run' pedido pelo modelo."""
         try:
             proc = subprocess.run(

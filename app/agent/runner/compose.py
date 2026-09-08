@@ -5,13 +5,19 @@
 #  protocolo de ações (11c) reusar sem duplicar.
 # ============================================================
 
+from typing import TYPE_CHECKING
+
 from app.agent.context import ProjectContext
+
+if TYPE_CHECKING:  # anotação só para o editor (não roda em runtime)
+    from app.agent import AgentIdentity
 
 
 class PromptComposer:
     """Compõe o prompt enviado ao executor."""
 
-    def __init__(self, use_context: bool = True, identity=None):
+    def __init__(self, use_context: bool = True,
+                 identity: "AgentIdentity | None" = None) -> None:
         self.use_context = use_context
         self.identity = identity
 

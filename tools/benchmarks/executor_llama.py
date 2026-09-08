@@ -45,7 +45,7 @@ class LlamaExecutor(ModelExecutor):
         # temperatura maior no retry: prompt idêntico com temperature baixa
         # reproduz a mesma resposta (loop); subir quebra o determinismo.
         self.retry_temperature = retry_temperature
-        self.last_raw: str | None = None
+        self.last_raw: dict | None = None
 
     def _build_messages(self, instruction: str,
                         feedback: str | None = None) -> list:
@@ -180,7 +180,7 @@ class LlamaExecutor(ModelExecutor):
         return result
 
     def _run(self, instruction: str, project_dir: str,
-             feedback: str = None) -> dict:
+             feedback: str | None = None) -> dict:
         log = get_agent_logger()
         if log:
             log.debug(

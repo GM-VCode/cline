@@ -76,14 +76,10 @@ class TestCastHelpers(unittest.TestCase):
 
 class TestBaseUrl(unittest.TestCase):
     def test_base_url_se_deriva_de_host_y_port(self):
-        cfg = object.__new__(Config)  # evita recargar .env en __init__
+        cfg = Config()
         cfg.HOST = "127.0.0.1"
         cfg.PORT = 9000
-        # La property lee self.HOST / self.PORT vía los atributos de clase;
-        # para un objeto "pelado" forzamos los atributos de instancia.
-        cfg.HOST = "127.0.0.1"
-        cfg.PORT = 9000
-        self.assertEqual(Config.BASE_URL.fget(cfg), "http://127.0.0.1:9000/v1")
+        self.assertEqual(cfg.BASE_URL, "http://127.0.0.1:9000/v1")
 
 
 if __name__ == "__main__":

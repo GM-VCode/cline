@@ -7,25 +7,15 @@
 
 import os
 
-try:
-    from tools.logger import AppLogger
-    from app.config import Config
-except ImportError:  # pragma: no cover
-    AppLogger = None
-    Config = None
+from project_path import Config
+from tools.logger import AppLogger
 
 
-def get_agent_logger():
+def get_agent_logger() -> AppLogger:
     """AppLogger dedicado (logs/agent.log, nível DEBUG).
 
-    Override de path via env AGENT_LOG_PATH (usado pelos tests para não
-    poluirem o log real).
+    Override de path via env AGENT_LOG_PATH (usado pelos tests
+    para não poluírem o log real).
     """
-    if AppLogger is None:
-        return None
-    path = (os.environ.get("AGENT_LOG_PATH")
-            or (getattr(Config, "AGENT_LOG", None) if Config else None)
-            or os.path.join(
-                os.path.dirname(os.path.dirname(os.path.dirname(
-                    os.path.abspath(__file__)))), "logs", "agent.log"))
+    path = os.environ.get("AGENT_LOG_PATH") or Config().AGENT_LOG
     return AppLogger(name="agent", path=path, level="DEBUG")

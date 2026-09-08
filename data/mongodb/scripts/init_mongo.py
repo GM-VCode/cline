@@ -31,6 +31,10 @@ class MongoInitializer:
             return 1
         tasks = conn.collection("tasks")
         validations = conn.collection("validations")
+        if tasks is None or validations is None:  # defensivo (db ausente)
+            print("FALLO: coleções indisponíveis no MongoDB.")
+            conn.close()
+            return 1
         tasks.create_index("task_id", unique=True)
         validations.create_index([("task_id", 1), ("_id", -1)])
         print("MongoDB OK")

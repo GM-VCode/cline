@@ -7,11 +7,7 @@
 
 import os
 
-try:
-    from data.mongodb.connection import MongoConnection
-except ImportError:  # pragma: no cover
-    MongoConnection = None
-
+from data.mongodb.connection import MongoConnection
 from data.mongodb.store.runtime import RuntimePaths
 from data.mongodb.store.state import StateRepo
 from data.mongodb.store.history import HistoryCollection

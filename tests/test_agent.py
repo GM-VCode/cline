@@ -11,9 +11,9 @@ import sys
 import tempfile
 import unittest
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-if ROOT not in sys.path:
-    sys.path.insert(0, ROOT)
+from project_path import ProjectPath  # noqa: E402
+ProjectPath.ensure()
+ROOT = ProjectPath.ROOT
 
 # higiene: tests do agente NÃO poluem logs/agent.log real
 os.environ["AGENT_LOG_PATH"] = os.path.join(tempfile.gettempdir(),
@@ -103,8 +103,12 @@ class TestAgentRunner(unittest.TestCase):
             def __init__(self):
                 self.entries = []
 
-            def append_agent_run(self, entry):
+            def append_agent_run(self, entry, task_id=None):
                 self.entries.append(entry)
+                return entry
+
+            def save_state(self, payload, task_id=None):
+                return payload
 
         store = FakeStore()
         runner = AgentRunner(FakeExecutor(bug_antes=False),
@@ -149,8 +153,9 @@ class TestAgentRunner(unittest.TestCase):
             def execute(self, instruction, project_dir):
                 return self._respond(project_dir)
 
-            def execute_with_feedback(self, instruction, project_dir, fb):
-                self.feedbacks.append(fb)
+            def execute_with_feedback(self, instruction, project_dir,
+                                      feedback):
+                self.feedbacks.append(feedback)
                 return self._respond(project_dir)
 
         ex = RunRuim()

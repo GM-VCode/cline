@@ -7,7 +7,7 @@
 
 import os
 import time
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Protocol
 
 from app.agent.checks import CheckRunner
 from app.agent.debug import get_agent_logger
@@ -16,7 +16,16 @@ from app.agent.runner.cycle import AttemptCycle
 
 if TYPE_CHECKING:  # só p/ anotações (evita import circular em runtime)
     from app.agent import AgentIdentity
-    from app.task_store import TaskStore
+
+
+class TaskStoreProtocol(Protocol):
+    """Interface mínima de memória que o AgentRunner utiliza."""
+
+    def append_agent_run(self, entry: dict,
+                         task_id: str | None = None) -> dict: ...
+
+    def save_state(self, payload: dict,
+                   task_id: str | None = None) -> dict: ...
 
 
 class AgentRunner:
@@ -26,7 +35,7 @@ class AgentRunner:
                  max_attempts: int = 2, check_timeout: int = 120,
                  use_context: bool = True,
                  identity: "AgentIdentity | None" = None,
-                 store: "TaskStore | None" = None,
+                 store: TaskStoreProtocol | None = None,
                  max_actions: int | None = None):
         self.executor = executor
         self.check_cmd = check_cmd or []
@@ -64,6 +73,7 @@ class AgentRunner:
         attempts, retries = 0, 0
         ok, output, files = False, "", []
         internal_runs = 0
+        response: dict | None = None
         log = get_agent_logger()
         cycle = AttemptCycle(self.checks, project_dir, self.check_cmd)
         for attempt in range(1, self.max_attempts + 1):
@@ -136,8 +146,10 @@ class AgentRunner:
             if log:
                 log.info(
                     "memória OK: agent_runs->{} tasks->{} (task_id={}, db={})"
-                    .format(getattr(self.store.agent_runs, "last_backend", "?"),
-                            getattr(self.store.state, "last_backend", "?"),
+                    .format(getattr(getattr(self.store, "agent_runs", None),
+                                    "last_backend", "?"),
+                            getattr(getattr(self.store, "state", None),
+                                    "last_backend", "?"),
                             getattr(self.store, "task_id", "?"),
                             getattr(self.store, "db_name", "?")))
         except Exception as exc:  # memória nunca quebra o agente

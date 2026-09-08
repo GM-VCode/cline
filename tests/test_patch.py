@@ -109,9 +109,10 @@ class TestAgentRunnerEdits(unittest.TestCase):
                         "edit_errors": ["edit[0]: 'find' não encontrado"],
                         "run": None}
 
-            def execute_with_feedback(self, i, p, fb):
-                self.feedbacks.append(fb)
-                return self.execute(i, p)
+            def execute_with_feedback(self, instruction, project_dir,
+                                      feedback):
+                self.feedbacks.append(feedback)
+                return self.execute(instruction, project_dir)
 
         ex = Ruim()
         r = AgentRunner(ex, check_cmd=self.check,
