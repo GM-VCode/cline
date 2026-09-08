@@ -70,7 +70,7 @@ def default_catalog() -> list:
             "Edite calc.py: mude add(a, b) para aceitar um terceiro "
             "parâmetro c e somar os três.",
             ["calc.py"],
-            [("contem_3_params", _file_contains("calc.py", "def add(a, b, c)"))],
+            [("contem_3_params", _file_contains("calc.py", "def add(a, b, c"))],
         ),
         BenchmarkTask(
             "003_bug_simples", "bug",
@@ -103,7 +103,7 @@ def default_catalog() -> list:
             "Refatore calc.py: extraia a soma para uma função interna "
             "_sum(a, b, c) mantendo add(a, b, c) pública.",
             ["calc.py"],
-            [("add_publica", _file_contains("calc.py", "def add(a, b, c)")),
+            [("add_publica", _file_contains("calc.py", "def add(a, b, c")),
              ("sum_interna", _file_contains("calc.py", "def _sum"))],
         ),
         BenchmarkTask(

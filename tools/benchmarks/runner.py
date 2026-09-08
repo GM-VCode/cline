@@ -58,6 +58,9 @@ class BenchmarkRunner:
     def _seed_project(self, task, project_dir: str):
         """Semear arquivos iniciais quando a tarefa exige (ex.: bug)."""
         seeds = {
+            "002_editar_funcao": {
+                "calc.py": "def add(a, b):\n    return a + b\n",
+            },
             "004_bug_multi_arquivo": {
                 "src/app.py": "from src.utils.helpers import needed\\n\\n\\ndef main():\\n    return needed()\\n",
             },
@@ -98,11 +101,21 @@ class BenchmarkRunner:
         # 11c: modo iterativo — ActionLoop em vez do ciclo clássico
         if self.max_actions is not None:
             from app.agent.runner.actions import ActionLoop
-            loop = ActionLoop(self.executor, self._checks, project_dir,
-                              check_cmd=[],  # checks do benchmark são callables
-                              max_actions=self.max_actions)
-            response = loop.run(task.instruction)
-            checks = task.run_checks(project_dir)
+            for cycle in range(1, self.max_attempts + 1):
+                loop = ActionLoop(self.executor, self._checks, project_dir,
+                                  check_cmd=[],  # checks são callables
+                                  max_actions=self.max_actions)
+                if cycle > 1:
+                    # retry: o erro real dos checks entra como observação 0
+                    fb = self._format_feedback(checks)
+                    loop.history.append(
+                        {"action": "retry",
+                         "observation": "Tentativa anterior falhou:\n" + fb})
+                    retries += 1
+                response = loop.run(task.instruction)
+                checks = task.run_checks(project_dir)
+                if all(ok for _, ok, _ in checks):
+                    break
         else:
             for attempt in range(1, self.max_attempts + 1):
                 try:

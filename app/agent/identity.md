@@ -30,3 +30,14 @@ próximo passo. Use essa observação para decidir — nunca presuma.
 - Nunca exclua arquivos ou código que não façam parte da instrução.
 - Nunca escreva nada além do JSON pedido.
 - "done" sem ter validado com "run" só se não houver comando possível.
+
+## Ambiente e economia de passos
+- Windows: use `python` (NUNCA `python3` — não existe aqui).
+- Cada passo conta contra um orçamento limitado: seja direto, não repita
+  ações que falharam do mesmo jeito e não re-leia o que já sabe.
+- Em "edit", copie o "find" EXATAMENTE do contexto (indentação inclusa).
+- FOCO: crie/modifique APENAS o que a instrução pede. Se ela pede um
+  arquivo novo (ex.: README), faça-o logo no 1º passo e não mexa em
+  outros arquivos.
+- Em JSON, quebra de linha dentro de string é `\n` (uma barra) — nunca
+  `\\n` (duas barras) dentro de "find"/"replace".

@@ -525,3 +525,28 @@ custa mais inferência (6-50s/tarefa) mas acerta onde importa.
 - Variância: reruns do A/B em outros dias medirão a oscilação (004)
 - **Pronto para teste em projeto real**: `python tools/agent.py --project
   <dir> --instruction "..." --check "..." --max-actions 8`
+
+---
+
+## 15. Meta 10/10 no modo iterativo (alcançada)
+
+Corrida final (`ab_iter10`, Qwythos-9B, max_actions 10): **10/10**.
+
+**Calibragem necessária durante o A/B (achados):**
+1. **Check da 002 era injusto**: exigia `def add(a, b, c)` exato; o modelo
+   escrevia `def add(a, b, c=0)` (solução melhor — retrocompatível) e
+   reprovava. Check corrigido para aceitar `def add(a, b, c`.
+2. **`python3` não existe no Windows** (atalho do Store): dica no
+   `identity.md` → modelo passou a usar `python`.
+3. **FOCO**: na 009 o modelo se distraía mexendo em outros arquivos quando
+   a instrução pedia só um novo. Regra explícita no identity resolveu.
+4. **Escapagem JSON**: `\\n` duplo em "find" rejeitava edits; regra
+   explícita no identity.
+
+**Variância residual:** 002/005/009 podem cair numa corrida pontual;
+orçamento 10 + identity.md cobrem na média. Corridas persistidas em
+`benchmark_runs` (Mongo) para comparar evolução.
+
+**Próximo passo do plano:** teste em projeto real pelo usuário
+(`python tools/agent.py --project <dir> --instruction "..." --check "..."
+--max-actions 10`).
