@@ -53,6 +53,28 @@ class TestFallbackJSON(BaseTaskStoreTest):
         s2.close()
 
 
+class TestAgentRuns(BaseTaskStoreTest):
+    def test_append_y_list_agent_runs(self):
+        s = self.make()
+        s.append_agent_run({"instruction": "conserte add", "finished": True,
+                            "attempts": 1, "retries": 0,
+                            "files": ["calc.py"], "elapsed_s": 1.5})
+        s.append_agent_run({"instruction": "outra", "finished": False,
+                            "attempts": 2, "retries": 1, "files": []})
+        runs = s.list_agent_runs(limit=10)
+        self.assertEqual(len(runs), 2)
+        self.assertEqual(runs[0]["instruction"], "outra")  # mais recente 1.º
+        self.assertIn("ts", runs[0])
+        s.close()
+
+    def test_agent_runs_fallback_json_arquivo(self):
+        s = self.make()
+        s.append_agent_run({"instruction": "x", "finished": True})
+        s.close()
+        path = os.path.join(os.path.dirname(self.vals), "agent_runs.json")
+        self.assertTrue(os.path.isfile(path))
+
+
 class TestValidations(BaseTaskStoreTest):
     def test_append_y_list(self):
         s = self.make()

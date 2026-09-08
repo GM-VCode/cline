@@ -15,6 +15,10 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
+# higiene: tests do agente NÃO poluem logs/agent.log real
+os.environ["AGENT_LOG_PATH"] = os.path.join(tempfile.gettempdir(),
+                                            "agent_test.log")
+
 from app.agent import AgentRunner, CheckRunner    # noqa: E402
 
 
@@ -92,6 +96,29 @@ class TestAgentRunner(unittest.TestCase):
     def test_sem_check_cmd_passa_direto(self):
         runner = AgentRunner(FakeExecutor(bug_antes=True))
         r = runner.run("x", self.dir)
+        self.assertTrue(r["finished"])
+
+    def test_store_registra_execucao(self):
+        class FakeStore:
+            def __init__(self):
+                self.entries = []
+
+            def append_agent_run(self, entry):
+                self.entries.append(entry)
+
+        store = FakeStore()
+        runner = AgentRunner(FakeExecutor(bug_antes=False),
+                             check_cmd=self.check, store=store)
+        runner.run("conserte add", self.dir)
+        self.assertEqual(len(store.entries), 1)
+        e = store.entries[0]
+        self.assertTrue(e["finished"])
+        self.assertEqual(e["files"], ["calc.py"])
+
+    def test_sem_store_nao_registra_nada(self):
+        runner = AgentRunner(FakeExecutor(bug_antes=False),
+                             check_cmd=self.check, store=None)
+        r = runner.run("x", self.dir)  # não deve lançar
         self.assertTrue(r["finished"])
 
 

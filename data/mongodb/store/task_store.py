@@ -35,6 +35,7 @@ class TaskStore:
             base = os.path.dirname(validations_path)
             self.paths.diagnostics_path = os.path.join(base, "diagnostics.json")
             self.paths.benchmarks_path = os.path.join(base, "benchmarks.json")
+            self.paths.agent_runs_path = os.path.join(base, "agent_runs.json")
         self.task_id = self.paths.task_id
         self.uri = self.paths.uri
         self.db_name = self.paths.db_name
@@ -57,6 +58,9 @@ class TaskStore:
         self.benchmarks = HistoryCollection(
             self._conn, "benchmark_runs", self.paths.benchmarks_path,
             "benchmark", self.task_id, self._catch_error)
+        self.agent_runs = HistoryCollection(
+            self._conn, "agent_runs", self.paths.agent_runs_path,
+            "agent_run", self.task_id, self._catch_error)
 
     def _catch_error(self, msg: str):
         self._error = msg
@@ -96,6 +100,13 @@ class TaskStore:
 
     def list_benchmarks(self, limit: int = 20) -> list:
         return self.benchmarks.list(limit)
+
+    # ---------- execuções do agente ----------
+    def append_agent_run(self, entry: dict) -> dict:
+        return self.agent_runs.append(entry)
+
+    def list_agent_runs(self, limit: int = 20) -> list:
+        return self.agent_runs.list(limit)
 
     def close(self):
         if self._conn is not None:

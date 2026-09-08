@@ -43,16 +43,25 @@ class AgentCLI:
                        help="não incluir o contexto do projeto no prompt")
         p.add_argument("--no-identity", action="store_true",
                        help="não incluir o prompt de identidade")
+        p.add_argument("--no-memory", action="store_true",
+                       help="não registrar a execução no Mongo/JSON")
         return p.parse_args(argv)
 
     def run(self) -> int:
         check_cmd = self.args.check.split() if self.args.check else []
         executor = LlamaExecutor(temperature=self.args.temperature)
         identity = None if self.args.no_identity else AgentIdentity()
+        store = None
+        if not self.args.no_memory:
+            try:
+                from app import TaskStore
+                store = TaskStore()
+            except Exception:
+                store = None
         runner = AgentRunner(executor, check_cmd=check_cmd,
                              max_attempts=self.args.max_attempts,
                              use_context=not self.args.no_context,
-                             identity=identity)
+                             identity=identity, store=store)
         result = runner.run(self.args.instruction, self.args.project)
         print(f"finalizado: {result['finished']}  "
               f"tentativas: {result['attempts']}  "

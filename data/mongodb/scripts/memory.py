@@ -59,6 +59,19 @@ class MemoryCli:
                   f"(fails={d.get('fails', '?')}, warns={d.get('warns', '?')})")
         return 0
 
+    def _agent_runs(self, limit: int) -> int:
+        runs = self.store.list_agent_runs(limit=limit)
+        if not runs:
+            print("Nenhuma execução do agente registrada ainda (rode tools/agent.py).")
+            return 0
+        print(f"=== ÚLTIMAS {len(runs)} EXECUÇÕES DO AGENTE ===")
+        for r in runs:
+            print(f"  [{r.get('ts', '?')}] finalizado={r.get('finished')} "
+                  f"tentativas={r.get('attempts')} retries={r.get('retries')} "
+                  f"tempo={r.get('elapsed_s')}s arquivos={r.get('files')}")
+            print(f"      instr: {str(r.get('instruction', ''))[:80]}")
+        return 0
+
     def run(self, argv) -> int:
         cmd = argv[0] if argv else "state"
         if cmd == "state":
@@ -69,7 +82,10 @@ class MemoryCli:
         if cmd == "diagnostics":
             limit = int(argv[1]) if len(argv) > 1 else 20
             return self._diagnostics(limit)
-        print("Uso: memory.py [state|validations|diagnostics [N]]")
+        if cmd == "agent-runs":
+            limit = int(argv[1]) if len(argv) > 1 else 20
+            return self._agent_runs(limit)
+        print("Uso: memory.py [state|validations|diagnostics|agent-runs [N]]")
         return 2
 
 

@@ -19,13 +19,14 @@ class AgentRunner:
 
     def __init__(self, executor, check_cmd: list = None, max_attempts: int = 2,
                  check_timeout: int = 120, use_context: bool = True,
-                 identity=None):
+                 identity=None, store=None):
         self.executor = executor
         self.check_cmd = check_cmd or []
         self.max_attempts = max(1, max_attempts)
         self.checks = CheckRunner(timeout=check_timeout)
         self.use_context = use_context
         self.identity = identity
+        self.store = store  # TaskStore opcional: registra cada execução
 
     def _compose(self, instruction: str, project_dir: str) -> str:
         parts = []
@@ -39,6 +40,12 @@ class AgentRunner:
         return "\n\n".join(parts)
 
     def run(self, instruction: str, project_dir: str) -> dict:
+        """Ciclo completo + registro na memória (se store configurado)."""
+        result = self._run_cycle(instruction, project_dir)
+        self._record(instruction, project_dir, result)
+        return result
+
+    def _run_cycle(self, instruction: str, project_dir: str) -> dict:
         """Ciclo completo: modelo -> aplica -> verifica -> retry."""
         if not os.path.isdir(project_dir):
             return {"finished": False, "error": "projeto não existe",
@@ -81,6 +88,26 @@ class AgentRunner:
             "check_output": output[:2000],
             "elapsed_s": round(time.time() - started, 2),
         }
+
+    def _record(self, instruction: str, project_dir: str, result: dict):
+        """Registra a execução na memória (Mongo/JSON), se store configurado."""
+        if self.store is None:
+            return
+        try:
+            self.store.append_agent_run({
+                "instruction": instruction[:500],
+                "project": project_dir,
+                "finished": result.get("finished"),
+                "attempts": result.get("attempts"),
+                "retries": result.get("retries"),
+                "files": result.get("files_written", []),
+                "elapsed_s": result.get("elapsed_s"),
+                "error": (result.get("error") or "")[:300],
+            })
+        except Exception as exc:  # memória nunca quebra o agente
+            log = get_agent_logger()
+            if log:
+                log.warn(f"falha ao registrar execução: {exc}")
 
     def _check(self, project_dir: str) -> tuple:
         if not self.check_cmd:

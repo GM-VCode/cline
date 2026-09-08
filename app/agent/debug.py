@@ -16,10 +16,16 @@ except ImportError:  # pragma: no cover
 
 
 def get_agent_logger():
-    """AppLogger dedicado (logs/agent.log, nível DEBUG)."""
+    """AppLogger dedicado (logs/agent.log, nível DEBUG).
+
+    Override de path via env AGENT_LOG_PATH (usado pelos tests para não
+    poluirem o log real).
+    """
     if AppLogger is None:
         return None
-    path = (getattr(Config, "AGENT_LOG", None) if Config else None) or os.path.join(
-        os.path.dirname(os.path.dirname(os.path.dirname(
-            os.path.abspath(__file__)))), "logs", "agent.log")
+    path = (os.environ.get("AGENT_LOG_PATH")
+            or (getattr(Config, "AGENT_LOG", None) if Config else None)
+            or os.path.join(
+                os.path.dirname(os.path.dirname(os.path.dirname(
+                    os.path.abspath(__file__)))), "logs", "agent.log"))
     return AppLogger(name="agent", path=path, level="DEBUG")

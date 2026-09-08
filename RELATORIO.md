@@ -292,3 +292,47 @@ Antes da etapa 9 isso era impossível (ele teria que adivinhar).
 **Pendente (opcional):** benchmark A/B `--real` com vs. sem contexto — deixar
 para quando o usuário quiser gastar VRAM; a prova de ponta a ponta já cobre o
 critério funcional.
+
+### 9.1 Achado pós-etapa 9 — loop de retry não convergia (corrigido, `16031fd`)
+
+O teste de visão revelou, graças ao novo log de debug, por que retries
+reproduziam a mesma resposta idêntica (o "baba" relatado no fire drill):
+
+- **Causa raiz 1:** temperature 0.2 + prompt idêntico no retry = resposta
+  **byte a byte idêntica** (determinismo). O modelo "corrigia" só no texto
+  da nota (`note: "Corrigido: adicionei imports..."`) sem mudar o código.
+- **Causa raiz 2:** o feedback dizia que falhou, mas **não mostrava o que o
+  modelo tinha escrito de fato** — ele não sabia o que revisar.
+
+**Correções:**
+| Mudança | Arquivo | Efeito |
+|---|---|---|
+| `retry_temperature: 0.7` no retry | `executor_llama.py` | quebra o determinismo; 2.ª tentativa explora caminho diferente |
+| Feedback inclui o conteúdo real escrito + aviso "correção na nota não aplica nada" | `checks.py`, `runner.py` | impossível "corrigir só na nota" |
+| Log de debug dedicado | `app/agent/debug.py` → `logs/agent.log` | registra prompt, resposta bruta, arquivos e feedback de cada retry (sempre DEBUG, independe do `.env`) |
+
+**Prova:** teste que travava em 3 tentativas idênticas agora converge:
+tentativa 2 tentou import errado (`from relatorio import ...` — caminho novo),
+tentativa 3 corrigiu de verdade (`from utils import ...`) → verificação OK.
+
+---
+
+## 10. PRÓXIMA ETAPA — Orquestração: memória das execuções do agente
+
+**Objetivo:** cada execução do `AgentRunner` fica registrada no Mongo
+(base `cline_agent`, coleção `agent_runs` + fallback JSON), permitindo
+consultar histórico/evolução fora do benchmark.
+
+**Plano (etapas pequenas, cada uma com teste):**
+1. Higiene: `get_agent_logger()` aceita override via env `AGENT_LOG_PATH`;
+   tests usam path temporário (não poluem `logs/agent.log` real).
+2. `TaskStore`: coleção `agent_runs` (`append_agent_run`/`list_agent_runs`,
+   fallback JSON `data/json/agent_runs.json`) — mesmo padrão de `validations`.
+3. Plug: `AgentRunner.run()` registra o resultado (instrução, finalizado,
+   tentativas, retries, arquivos, tempo) no fim do ciclo; CLI com
+   `--no-memory` para desligar.
+4. Testes: append/list no fallback JSON, execução sem memória, registro
+   após corrida com executor fake.
+
+**Critério de conclusão:** suite OK (63+), `validate.py` exit 0, e uma
+execução real do `tools/agent.py` aparecendo em `memory.py agent-runs`.

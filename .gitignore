@@ -25,5 +25,6 @@ tmp/
 # por NOMBRE, pero data/json/ y data/ SE RASTREAN (no ignorar carpetas)
 data/json/task-state.json
 data/json/validations.json
+data/json/agent_runs.json
 # __pycache__ en toda parte (incl. data/mongodb/)
 __pycache__/
