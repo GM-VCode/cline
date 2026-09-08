@@ -11,6 +11,10 @@ import os
 import shutil
 import tempfile
 import time
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:  # só p/ anotações (import real é lazy no __init__)
+    from app.agent.checks import CheckRunner
 
 
 class ModelExecutor:
@@ -35,14 +39,14 @@ class BenchmarkRunner:
     """Roda tarefas do benchmark e coleta métricas por tarefa."""
 
     def __init__(self, executor: ModelExecutor, tasks: list,
-                 work_root: str = None, max_attempts: int = 2,
-                 max_actions: int = None):
+                 work_root: str | None = None, max_attempts: int = 2,
+                 max_actions: int | None = None):
         self.executor = executor
         self.tasks = tasks
         self.work_root = work_root or tempfile.gettempdir()
         self.max_attempts = max(1, max_attempts)
         self.max_actions = max_actions  # 11c: None = ciclo clássico
-        self._checks = None
+        self._checks: "CheckRunner | None" = None
         if max_actions is not None:
             from app.agent.checks import CheckRunner
             self._checks = CheckRunner(timeout=120)

@@ -505,3 +505,42 @@ orçamento 10 + identity.md cobrem na média. Corridas persistidas em
 **Próximo passo do plano:** teste em projeto real pelo usuário
 (`python tools/agent.py --project <dir> --instruction "..." --check "..."
 --max-actions 10`).
+
+---
+
+## 16. Proxy de memória — o Cline (VS Code) gravando no Mongo (concluída)
+
+**Diagnóstico ("por que não salva?"):** o Mongo e o pipeline funcionavam
+(e2e de 03:12–03:25 + smoke `tasks->mongo agent_runs->mongo`); o
+`agent.log` não tinha entradas após 03:25 e o `llama-server.err.log`
+mostrava prompts de ~40k tokens → a missão rodava pelo **Cline/VS Code**,
+que fala **direto** com o llama-server — caminho sem `TaskStore`, por
+design. Solução escolhida: proxy transparente com memória.
+
+| Módulo | Papel |
+|---|---|
+| `app/services/proxy/sessions.py` | `SessionRegistry`: session_id estável (prioriza `session_id` do corpo; senão normalização da 1.ª mensagem do user — multimodal suportado), contador por sessão, thread-safe |
+| `app/services/proxy/handler.py` | `ProxyHandler`: repassa GET/POST ao upstream; SSE via `read1`+flush (tokens chegam em tempo real); erros 4xx/5xx do upstream repassados como vieram; grava no Mongo **antes** de repassar (memória nunca quebra o proxy) |
+| `app/services/proxy/server.py` | `ProxyServer`: ThreadingHTTPServer + injeção de store/upstream/sessions |
+| `tools/proxy.py` | CLI `--host --port --upstream --no-memory` + relatório de memória no início |
+
+**Data layer (compatível):** `save_state/load_state`, `append_agent_run/
+list_agent_runs` e `HistoryCollection` ganharam `task_id` opcional — cada
+sessão do Cline grava com o próprio id. No fallback JSON, `list` passou a
+**filtrar por task_id** (o arquivo é histórico único). `tools/logger.py`
+escreve no arquivo antes do `print` e sobrevive a console cp1252.
+
+**Prova real:** GET `/v1/models` 200; POST não-stream 200; POST stream 200
+com SSE íntegro (`data:` presente); cada requisição → 1 doc em `tasks`
+(source `cline-proxy`) + 1 em `agent_runs` (`tasks->mongo
+agent_runs->mongo`); limpeza devolveu o banco ao estado original.
+
+**Uso:** subir o servidor normalmente + `python tools/proxy.py` + Base URL
+do Cline `http://127.0.0.1:8081/v1`.
+
+**Limitação conhecida:** o status da task fica `in_progress` (a API do
+llama-server não sinaliza o "fim" de uma conversa do Cline); cada
+requisição = 1 doc em `agent_runs`.
+
+**Validação:** 96 tests OK (88 + 8 novos em `tests/test_proxy_sessions.py`),
+`validate.py` exit 0, smoke de ponta a ponta limpo (sem WARNs).

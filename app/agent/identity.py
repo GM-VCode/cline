@@ -10,7 +10,7 @@ import os
 class AgentIdentity:
     """Identidade/regras do agente em arquivo editável (identity.md)."""
 
-    def __init__(self, path: str = None):
+    def __init__(self, path: str | None = None):
         self.path = path or os.path.join(
             os.path.dirname(os.path.abspath(__file__)), "identity.md")
         self.text = self._load()

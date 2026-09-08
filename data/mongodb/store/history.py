@@ -20,29 +20,32 @@ class HistoryCollection:
         self.label = label          # p/ mensagens de erro
         self.task_id = task_id
         self.error_sink = error_sink or (lambda msg: None)
+        self.last_backend = None    # "mongo" | "json" no último append
 
     @property
     def _coll(self):
         return self.conn.collection(self.coll_name) if self.conn else None
 
-    def append(self, entry: dict) -> dict:
+    def append(self, entry: dict, task_id: str | None = None) -> dict:
         if not isinstance(entry, dict):
             entry = {"value": entry}
         entry = dict(entry)
-        entry.setdefault("task_id", self.task_id)
+        entry.setdefault("task_id", task_id or self.task_id)
         entry.setdefault("ts", time.strftime("%Y-%m-%dT%H:%M:%S"))
         if self.conn and self.conn.active:
             try:
                 self._coll.insert_one(dict(entry))
+                self.last_backend = "mongo"
                 return entry
             except Exception as exc:  # pragma: no cover
                 self.error_sink(f"Falha Mongo ({self.coll_name}): {exc}")
         return self._append_json(entry)
 
-    def list(self, limit: int = 20) -> list:
+    def list(self, limit: int = 20, task_id: str | None = None) -> list:
+        tid = task_id or self.task_id
         if self.conn and self.conn.active:
             try:
-                cursor = (self._coll.find({"task_id": self.task_id})
+                cursor = (self._coll.find({"task_id": tid})
                           .sort("_id", -1).limit(limit))
                 out = [{k: v for k, v in doc.items() if k != "_id"}
                        for doc in cursor]
@@ -52,6 +55,10 @@ class HistoryCollection:
         history = JsonFile.read(self.json_path)
         if not isinstance(history, list):
             return []
+        # fallback JSON é um arquivo único: filtra pelo task_id
+        history = [e for e in history
+                   if isinstance(e, dict)
+                   and e.get("task_id") == tid]
         return list(reversed(history[-limit:]))
 
     def _append_json(self, entry: dict) -> dict:
@@ -60,4 +67,5 @@ class HistoryCollection:
             history = []
         history.append(entry)
         JsonFile.write(self.json_path, history)
+        self.last_backend = "json"
         return entry

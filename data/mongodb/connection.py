@@ -5,6 +5,7 @@
 # ============================================================
 
 from pymongo import MongoClient
+from pymongo.database import Database
 
 
 class MongoConnection:
@@ -14,9 +15,9 @@ class MongoConnection:
                  timeout_ms: int = 2000):
         self.uri = uri
         self.db_name = db_name
-        self._client = None
-        self._db = None
-        self.error = None
+        self._client: MongoClient | None = None
+        self._db: Database | None = None
+        self.error: str | None = None
         self._connect(timeout_ms)
 
     def _connect(self, timeout_ms: int):

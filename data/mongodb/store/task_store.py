@@ -20,8 +20,10 @@ from data.mongodb.store.history import HistoryCollection
 class TaskStore:
     """Memória do agente: estado + históricos (Mongo com fallback JSON)."""
 
-    def __init__(self, uri=None, db=None, state_path=None,
-                 validations_path=None, timeout_ms=2000):
+    def __init__(self, uri: str | None = None, db: str | None = None,
+                 state_path: str | None = None,
+                 validations_path: str | None = None,
+                 timeout_ms: int = 2000):
         self.paths = RuntimePaths()
         if uri:
             self.paths.uri = uri
@@ -40,8 +42,8 @@ class TaskStore:
         self.uri = self.paths.uri
         self.db_name = self.paths.db_name
 
-        self._conn = None
-        self._error = None
+        self._conn: "MongoConnection | None" = None
+        self._error: str | None = None
         if MongoConnection is not None:
             self._conn = MongoConnection(self.uri, self.db_name, timeout_ms)
             self._error = self._conn.error
@@ -74,11 +76,11 @@ class TaskStore:
         return self._error
 
     # ---------- estado ----------
-    def save_state(self, payload: dict) -> dict:
-        return self.state.save(payload)
+    def save_state(self, payload: dict, task_id: str | None = None) -> dict:
+        return self.state.save(payload, task_id=task_id)
 
-    def load_state(self) -> dict:
-        return self.state.load()
+    def load_state(self, task_id: str | None = None) -> dict:
+        return self.state.load(task_id=task_id)
 
     # ---------- validações ----------
     def append_validation(self, entry: dict) -> dict:
@@ -102,11 +104,13 @@ class TaskStore:
         return self.benchmarks.list(limit)
 
     # ---------- execuções do agente ----------
-    def append_agent_run(self, entry: dict) -> dict:
-        return self.agent_runs.append(entry)
+    def append_agent_run(self, entry: dict,
+                         task_id: str | None = None) -> dict:
+        return self.agent_runs.append(entry, task_id=task_id)
 
-    def list_agent_runs(self, limit: int = 20) -> list:
-        return self.agent_runs.list(limit)
+    def list_agent_runs(self, limit: int = 20,
+                        task_id: str | None = None) -> list:
+        return self.agent_runs.list(limit, task_id=task_id)
 
     def close(self):
         if self._conn is not None:

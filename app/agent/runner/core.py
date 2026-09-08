@@ -7,19 +7,27 @@
 
 import os
 import time
+from typing import TYPE_CHECKING
 
 from app.agent.checks import CheckRunner
 from app.agent.debug import get_agent_logger
 from app.agent.runner.compose import PromptComposer
 from app.agent.runner.cycle import AttemptCycle
 
+if TYPE_CHECKING:  # só p/ anotações (evita import circular em runtime)
+    from app.agent import AgentIdentity
+    from app.task_store import TaskStore
+
 
 class AgentRunner:
     """Executa uma tarefa de código com o modelo + verificação real."""
 
-    def __init__(self, executor, check_cmd: list = None, max_attempts: int = 2,
-                 check_timeout: int = 120, use_context: bool = True,
-                 identity=None, store=None, max_actions: int = None):
+    def __init__(self, executor, check_cmd: list | None = None,
+                 max_attempts: int = 2, check_timeout: int = 120,
+                 use_context: bool = True,
+                 identity: "AgentIdentity | None" = None,
+                 store: "TaskStore | None" = None,
+                 max_actions: int | None = None):
         self.executor = executor
         self.check_cmd = check_cmd or []
         self.max_attempts = max(1, max_attempts)
@@ -124,6 +132,14 @@ class AgentRunner:
                     "error": (result.get("error") or "")[:300],
                 },
             })
+            log = get_agent_logger()
+            if log:
+                log.info(
+                    "memória OK: agent_runs->{} tasks->{} (task_id={}, db={})"
+                    .format(getattr(self.store.agent_runs, "last_backend", "?"),
+                            getattr(self.store.state, "last_backend", "?"),
+                            getattr(self.store, "task_id", "?"),
+                            getattr(self.store, "db_name", "?")))
         except Exception as exc:  # memória nunca quebra o agente
             log = get_agent_logger()
             if log:

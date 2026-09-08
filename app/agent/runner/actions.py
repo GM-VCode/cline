@@ -41,7 +41,7 @@ class ActionLoop:
         self.files_written = []
         self.applier = PatchApplier()
 
-    def _feedback(self, extra: str = None) -> str:
+    def _feedback(self, extra: str | None = None) -> str:
         parts = []
         for i, h in enumerate(self.history, 1):
             parts.append(f"passo {i} ({h['action']}): {h['observation'][:300]}")

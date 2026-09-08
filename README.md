@@ -37,6 +37,30 @@
 
 ---
 
+## 🧠 Proxy de memória (opcional — tarefas do Cline no MongoDB)
+
+Do jeito padrão, o Cline fala **direto** com o llama-server e **nada é
+registrado** no MongoDB. O proxy fica no meio e grava cada tarefa:
+
+```
+Cline (VS Code) → proxy (:8081) → llama-server (:8080)
+                        ↓
+        MongoDB (cline_agent): tasks + agent_runs
+```
+
+1. 🖱️ Suba o servidor normalmente (atalho `INICIAR-Qwythos-9B`)
+2. 🧠 Abra um cmd na pasta do projeto e rode: `python tools\proxy.py`
+   (fica rodando; `Ctrl+C` para parar)
+3. 🔌 No Cline, troque só a **Base URL** para `http://127.0.0.1:8081/v1`
+   (API Key e Model ID continuam iguais)
+
+Cada conversa vira 1 doc em `tasks` e cada requisição 1 doc em `agent_runs`
+(db `cline_agent`; sem Mongo ativo, cai para JSON em `data\json\`).
+Feche o proxy e volte a Base URL para `http://127.0.0.1:8080/v1` para
+voltar ao modo direto (sem registro).
+
+---
+
 ## 🏗️ Arquitetura
 
 ```

@@ -12,18 +12,20 @@ import argparse
 import os
 import sys
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-if ROOT not in sys.path:
-    sys.path.insert(0, ROOT)
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from app.agent import AgentIdentity, AgentRunner
-from tools.benchmarks.executor_llama import LlamaExecutor
+from project_path import ProjectPath  # noqa: E402
+ProjectPath.ensure()
+
+from app.agent import AgentIdentity, AgentRunner  # noqa: E402
+from app.agent.debug import get_agent_logger  # noqa: E402
+from tools.benchmarks.executor_llama import LlamaExecutor  # noqa: E402
 
 
 class AgentCLI:
     """Ponto de entrada do agente pela linha de comando."""
 
-    def __init__(self, argv: list = None):
+    def __init__(self, argv: list | None = None):
         self.args = self._parse(argv)
 
     @staticmethod
@@ -39,7 +41,7 @@ class AgentCLI:
                             "executado via shell no projeto)")
         p.add_argument("--max-attempts", type=int, default=2)
         p.add_argument("--max-actions", type=int, default=None,
-                       help="ativa modo iterativo (ação→observação, "
+                       help="ativa modo iterativo (ação->observação, "
                             "protocolo 11c) com esse orçamento de passos")
         p.add_argument("--temperature", type=float, default=0.2)
         p.add_argument("--no-context", action="store_true",
@@ -50,17 +52,41 @@ class AgentCLI:
                        help="não registrar a execução no Mongo/JSON")
         return p.parse_args(argv)
 
+    @staticmethod
+    def _say(msg: str, log) -> None:
+        """Mostra no console e registra em logs/agent.log."""
+        print(msg)
+        if log:
+            log.info(msg)
+
+    def _memory_report(self, store, log) -> None:
+        """Diagnóstico de memória: Mongo ativo, fallback JSON ou off."""
+        if store is None:
+            motivo = ("--no-memory" if self.args.no_memory
+                      else "falha ao criar o TaskStore")
+            self._say(f"memória: DESATIVADA ({motivo})", log)
+        elif store.active:
+            self._say(f"memória: Mongo ATIVO (db={store.db_name}, "
+                      f"task_id={store.task_id})", log)
+        else:
+            self._say(f"memória: Mongo INDISPONÍVEL -> fallback JSON "
+                      f"({store.error})", log)
+
     def run(self) -> int:
         check_cmd = self.args.check.split() if self.args.check else []
         executor = LlamaExecutor(temperature=self.args.temperature)
         identity = None if self.args.no_identity else AgentIdentity()
+        log = get_agent_logger()
         store = None
         if not self.args.no_memory:
             try:
                 from app import TaskStore
                 store = TaskStore()
-            except Exception:
+            except Exception as exc:
                 store = None
+                self._say(f"memória: TaskStore não pôde ser criado "
+                          f"({exc})", log)
+        self._memory_report(store, log)
         runner = AgentRunner(executor, check_cmd=check_cmd,
                              max_attempts=self.args.max_attempts,
                              use_context=not self.args.no_context,
@@ -75,6 +101,9 @@ class AgentCLI:
         print(f"arquivos: {result.get('files_written', [])}")
         if result.get("check_output"):
             print(f"verificação: {result['check_output'][:400]}")
+        if store is not None:
+            self._say(f"registro: tasks->{store.state.last_backend}  "
+                      f"agent_runs->{store.agent_runs.last_backend}", log)
         return 0 if result["finished"] else 1
 
 
