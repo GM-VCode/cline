@@ -16,7 +16,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
-from app.agent import AgentRunner
+from app.agent import AgentIdentity, AgentRunner
 from tools.benchmarks.executor_llama import LlamaExecutor
 
 
@@ -39,13 +39,20 @@ class AgentCLI:
                             "executado via shell no projeto)")
         p.add_argument("--max-attempts", type=int, default=2)
         p.add_argument("--temperature", type=float, default=0.2)
+        p.add_argument("--no-context", action="store_true",
+                       help="não incluir o contexto do projeto no prompt")
+        p.add_argument("--no-identity", action="store_true",
+                       help="não incluir o prompt de identidade")
         return p.parse_args(argv)
 
     def run(self) -> int:
         check_cmd = self.args.check.split() if self.args.check else []
         executor = LlamaExecutor(temperature=self.args.temperature)
+        identity = None if self.args.no_identity else AgentIdentity()
         runner = AgentRunner(executor, check_cmd=check_cmd,
-                             max_attempts=self.args.max_attempts)
+                             max_attempts=self.args.max_attempts,
+                             use_context=not self.args.no_context,
+                             identity=identity)
         result = runner.run(self.args.instruction, self.args.project)
         print(f"finalizado: {result['finished']}  "
               f"tentativas: {result['attempts']}  "

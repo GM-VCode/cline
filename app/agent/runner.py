@@ -10,23 +10,39 @@ import os
 import time
 
 from app.agent.checks import CheckRunner
+from app.agent.context import ProjectContext
 
 
 class AgentRunner:
     """Executa uma tarefa de código com o modelo + verificação real."""
 
     def __init__(self, executor, check_cmd: list = None, max_attempts: int = 2,
-                 check_timeout: int = 120):
+                 check_timeout: int = 120, use_context: bool = True,
+                 identity=None):
         self.executor = executor
         self.check_cmd = check_cmd or []
         self.max_attempts = max(1, max_attempts)
         self.checks = CheckRunner(timeout=check_timeout)
+        self.use_context = use_context
+        self.identity = identity
+
+    def _compose(self, instruction: str, project_dir: str) -> str:
+        parts = []
+        if self.identity:
+            ident = self.identity.to_prompt()
+            if ident:
+                parts.append(ident)
+        if self.use_context:
+            parts.append(ProjectContext(project_dir).to_prompt())
+        parts.append(f"INSTRUÇÃO: {instruction}")
+        return "\n\n".join(parts)
 
     def run(self, instruction: str, project_dir: str) -> dict:
         """Ciclo completo: modelo -> aplica -> verifica -> retry."""
         if not os.path.isdir(project_dir):
             return {"finished": False, "error": "projeto não existe",
                     "attempts": 0, "retries": 0}
+        prompt = self._compose(instruction, project_dir)
 
         started = time.time()
         attempts, retries = 0, 0
@@ -35,11 +51,11 @@ class AgentRunner:
             attempts = attempt
             try:
                 if attempt == 1:
-                    response = self.executor.execute(instruction, project_dir)
+                    response = self.executor.execute(prompt, project_dir)
                 else:
                     feedback = CheckRunner.feedback_from(instruction, output)
                     response = self.executor.execute_with_feedback(
-                        instruction, project_dir, feedback)
+                        prompt, project_dir, feedback)
                     retries += 1
             except Exception as exc:
                 return {"finished": False, "error": str(exc),

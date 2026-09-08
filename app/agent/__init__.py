@@ -9,6 +9,8 @@
 # ============================================================
 
 from app.agent.checks import CheckRunner      # noqa: F401
+from app.agent.context import ProjectContext  # noqa: F401
+from app.agent.identity import AgentIdentity  # noqa: F401
 from app.agent.runner import AgentRunner      # noqa: F401
 
-__all__ = ["AgentRunner", "CheckRunner"]
+__all__ = ["AgentRunner", "CheckRunner", "ProjectContext", "AgentIdentity"]
