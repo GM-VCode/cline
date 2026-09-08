@@ -483,51 +483,6 @@ custa mais inferência (6-50s/tarefa) mas acerta onde importa.
   <dir> --instruction "..." --check "..." --max-actions 8`
 ---
 
-## 14. Benchmark A/B — clássico vs. iterativo (resultados reais)
-
-Qwythos-9B, 10 tarefas, mesma noite (00:00-00:40):
-
-| Tarefa | Clássico | Iterativo (11c) |
-|---|---|---|
-| 001 criar função | ✅ 3/3 | ✅ 3/3 |
-| 002 editar função | ✅ | ✅ |
-| 003 bug simples | ✅ | ✅ |
-| 004 bug multi-arquivo | ✅ | ❌ 1/2 (oscilou) |
-| 005 feature c/ testes | ❌ 1/3 | ✅ **3/3** |
-| 006 refactor | ✅ | ✅ |
-| 007 interpretar erro | ✅ | ✅ |
-| 008 projeto desconhecido | ✅ | ✅ |
-| 009 código+docs | ❌ **0/2** | ✅ **2/2** |
-| 010 consertar incompleto | ✅ | ✅ |
-| **Total** | **8/10 (14/16 checks)** | **9/10 (17/18 checks)** |
-
-**Leitura:** o modo iterativo resolveu as 2 tarefas que o clássico falhava
-(005 e 009 — as mais pesadas, multi-passo) e só perdeu a 004 por oscilação
-estocástica. Velocidade: clássico mais rápido nas fáceis (1-9s); iterativo
-custa mais inferência (6-50s/tarefa) mas acerta onde importa.
-
-**Ajustes feitos durante o A/B** (bugs revelados pela corrida real):
-1. `task.checks` do benchmark são callables — não passar como `check_cmd`
-2. Inferência de `action` quando o modelo responde JSON sem o campo
-3. Métrica do benchmark = checks (orçamento estourado com checks verdes
-   não derruba a tarefa)
-
-**Veredito: modo iterativo é o padrão recomendado para tarefas reais**
-(`--max-actions 8`).
-
-**Validação:** 88 tests OK; ambas as corridas persistidas em `benchmark_runs`.
-
----
-
-## 15. Próximas frentes (para uso em projeto real)
-- **Visão (mmproj)**: plugar `image_data` no `LlamaExecutor` + `--image` na
-  CLI (o servidor já carrega o mmproj via `-mm`)
-- Variância: reruns do A/B em outros dias medirão a oscilação (004)
-- **Pronto para teste em projeto real**: `python tools/agent.py --project
-  <dir> --instruction "..." --check "..." --max-actions 8`
-
----
-
 ## 15. Meta 10/10 no modo iterativo (alcançada)
 
 Corrida final (`ab_iter10`, Qwythos-9B, max_actions 10): **10/10**.
