@@ -391,23 +391,31 @@ test_patch.py"` → `finalizado: True`, 1 tentativa, e o diff confirma que
 **Validação:** 78 tests OK (70 + 8 novos: patch ok, ambíguo, inexistente,
 fora do projeto, edit malformado, integração bom/rejeitado), validate exit 0.
 
-## 13. PRÓXIMA ETAPA — Etapa 11c: loop iterativo de ferramentas
+## 13. Etapa 11c — Loop iterativo de ferramentas — concluída
 
-**Objetivo:** encerrar o modelo de "um palpite por rodada" e chegar ao
-formato real de agente: várias rodadas de ação → observação → decisão,
-como o Cline faz.
+**Refactor prévio:** `runner.py` virou `runner/` (core/cycle/compose,
+commit `38a88f7`) para receber esta etapa dentro da regra de ≤200 linhas.
 
-1. `AgentRunner` passa a aceitar resposta em passos: o modelo devolve uma
-   AÇÃO por vez (`{"action": "write|edit|run|done", ...}`) e recebe a
-   OBSERVAÇÃO (saída do comando, erro do edit) antes da próxima decisão.
-2. Orçamento de ações por tarefa (`max_actions`, ex. 8) — fecha a pendência
-   antiga de limites duros anti-loop.
-3. Prompt de identidade (`identity.md`) documentando o novo protocolo.
-4. Tests fake: sequência edit→run→done; orçamento estourado; ação inválida.
-5. Prova real em tarefa de 2+ passos (ex.: ler contexto, corrigir, rodar teste).
+**Implementado:**
+- `runner/actions.py` — class `ActionLoop`: protocolo **UM passo por vez**
+  (`{"action": "write|edit|run|done", ...}`); após cada ação o modelo recebe
+  a **observação** (saída do comando / erro do edit) antes de decidir o
+  próximo. Orçamento duro `max_actions` (default 8) impede loop infinito.
+  A palavra final é a **verificação oficial**, não o `done`.
+- `core.py`: parâmetro `max_actions` ativa o modo iterativo (sem ele, o
+  ciclo antigo 11a/11b segue valendo — retrocompatível).
+- `LlamaExecutor.execute_action()`: mesmo parse JSON, protocolo de ações no
+  feedback, histórico de observações por passo.
+- CLI/benchmark continuam funcionando sem mudanças (modo antigo é o default).
 
-**Critério:** 78+ tests OK, validate 0, prova real multi-passo sem retried
-cego, RELATORIO atualizado.
+**Prova real (Qwythos-9B, modelo reiniciado):** bug em `stats.py`
+(`(a+b)/1`). O modelo executou: `edit` (aplicou o fix) → `run`
+(`$ python test_stats.py` → ITER_OK) → `done`. Resultado: `finished: True`,
+2 ações, 1 run interno, verificação oficial passou.
 
-**Riscos:** mais rodadas = mais inferência (mitigar com orçamento); modelo
-pode ciclar (mitigar: observação inclui histórico curto de ações já feitas).
+**Validação:** 86 tests OK (78 + 8 novos: sequência edit→run→done,
+orçamento estourado, ação inválida, done com/som check, write, plug no
+runner), `validate.py` exit 0.
+
+**Pendência menor:** expor `--max-actions` na CLI `tools/agent.py`
+(hoje só via API Python).

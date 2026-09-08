@@ -19,7 +19,7 @@ class AgentRunner:
 
     def __init__(self, executor, check_cmd: list = None, max_attempts: int = 2,
                  check_timeout: int = 120, use_context: bool = True,
-                 identity=None, store=None):
+                 identity=None, store=None, max_actions: int = None):
         self.executor = executor
         self.check_cmd = check_cmd or []
         self.max_attempts = max(1, max_attempts)
@@ -27,6 +27,7 @@ class AgentRunner:
         self.composer = PromptComposer(use_context=use_context,
                                        identity=identity)
         self.store = store  # TaskStore opcional: registra cada execução
+        self.max_actions = max_actions  # 11c: ativa o modo iterativo
 
     def run(self, instruction: str, project_dir: str) -> dict:
         """Ciclo completo + registro na memória (se store configurado)."""
@@ -40,6 +41,16 @@ class AgentRunner:
             return {"finished": False, "error": "projeto não existe",
                     "attempts": 0, "retries": 0}
         prompt = self.composer.compose(instruction, project_dir)
+
+        # 11c: modo iterativo (ação → observação) quando max_actions é dado
+        if self.max_actions is not None:
+            from app.agent.runner.actions import ActionLoop
+            loop = ActionLoop(self.executor, self.checks, project_dir,
+                              check_cmd=self.check_cmd,
+                              max_actions=self.max_actions)
+            result = loop.run(prompt)
+            result["elapsed_s"] = result.get("elapsed_s", 0)
+            return result
 
         started = time.time()
         attempts, retries = 0, 0

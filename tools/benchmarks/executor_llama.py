@@ -86,7 +86,7 @@ class LlamaExecutor(ModelExecutor):
         return content
 
     def _parse_files(self, content: str) -> tuple:
-        """Extrai (files, edits, run_cmd) do JSON que o modelo devolve."""
+        """Extrai (files, edits, run_cmd, action) do JSON do modelo."""
         content = content.strip()
         # robustez: extraer el sub-bloco JSON de files si viene suelto
         try:
@@ -94,15 +94,18 @@ class LlamaExecutor(ModelExecutor):
             end = content.rfind("}")
             obj = json.loads(content[start:end + 1])
         except (ValueError, json.JSONDecodeError):
-            return {}, [], None
+            return {}, [], None, None
         files = obj.get("files", {})
         if not isinstance(files, dict):
             files = {}
         edits = obj.get("edits", [])
         if not isinstance(edits, list):
             edits = []
-        run_cmd = obj.get("run")
-        return files, edits, (run_cmd if isinstance(run_cmd, str) else None)
+        run_cmd = obj.get("run") or obj.get("cmd")
+        action = obj.get("action")
+        return (files, edits,
+                run_cmd if isinstance(run_cmd, str) else None,
+                action if isinstance(action, str) else None)
 
     def _apply_files(self, files: dict, project_dir: str):
         for rel, body in files.items():
@@ -118,6 +121,19 @@ class LlamaExecutor(ModelExecutor):
                               feedback: str) -> dict:
         return self._run(instruction, project_dir, feedback=feedback)
 
+    def execute_action(self, instruction: str, project_dir: str,
+                       history: list) -> dict:
+        """11c: um passo por vez; histórico de observações no feedback."""
+        from app.agent.runner.actions import ACTION_SYSTEM
+        parts = [ACTION_SYSTEM]
+        for i, h in enumerate(history, 1):
+            parts.append(f"passo {i} ({h['action']}):\n{h['observation'][:400]}")
+        parts.append("Responda com o PRÓXIMO passo (um por vez).")
+        fb = "\n\n".join(parts)
+        result = self._run(instruction, project_dir, feedback=fb)
+        result.setdefault("action", None)
+        return result
+
     def _run(self, instruction: str, project_dir: str,
              feedback: str = None) -> dict:
         log = get_agent_logger()
@@ -127,7 +143,7 @@ class LlamaExecutor(ModelExecutor):
         resp = self._request(instruction, project_dir, feedback=feedback)
         self.last_raw = resp
         content = self._extract_content(resp)
-        files, edits, run_cmd = self._parse_files(content)
+        files, edits, run_cmd, action = self._parse_files(content)
         self._apply_files(files, project_dir)
         edit_report = []
         if edits:
@@ -156,5 +172,6 @@ class LlamaExecutor(ModelExecutor):
             "files": files,
             "edits_applied": edit_report,
             "run": run_cmd,
+            "action": action,
             "content_preview": content[:120],
         }
