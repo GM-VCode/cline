@@ -76,6 +76,54 @@ class Config:
         return raw if raw != "" else str(default)
 
     @staticmethod
+    def _resolve_model(dotenv: dict[str, str]) -> str:
+        """Caminho do modelo.
+
+        Se MODEL_PATH estiver preenchido no .env, usa direto.
+        Se vazio, auto-detecta o ÚNICO .gguf da pasta models/:
+          - 1 arquivo  -> usa ele
+          - 0 ou >1    -> retorna "" (validate() falha com mensagem clara)
+        """
+        raw = dotenv.get("MODEL_PATH", "").strip()
+        if raw:
+            return raw
+        models_dir = ProjectPath.MODELS_DIR
+        gguFs = sorted(
+            f for f in os.listdir(models_dir)
+            if f.lower().endswith(".gguf")) if os.path.isdir(models_dir) else []
+        return os.path.join(models_dir, gguFs[0]) if len(gguFs) == 1 else ""
+
+    def _resolve_mmproj(self, dotenv: dict[str, str]) -> str:
+        """Caminho do mmproj (visual).
+
+        - Se MM_PROJ_PATH vazio no .env -> "" (modo só texto)
+        - Se for um caminho absoluto (contém \\ ou /) -> usa direto
+        - Se for nome de arquivo (ex: Qwythos-...-Q8_0.gguf) -> resolve em models/
+        - Se for ID base do modelo (ex: Qwythos-9B-Claude-Mythos-5-1M-uncensored-
+          heretic) -> busca mmproj qualquer em models/ que contenha esse ID
+        """
+        raw = dotenv.get("MM_PROJ_PATH", "").strip()
+        if not raw:
+            return ""
+        # caminho absoluto: usa como está
+        if "\\" in raw or "/" in raw:
+            return raw
+        models_dir = ProjectPath.MODELS_DIR
+        if not os.path.isdir(models_dir):
+            return ""
+        files = os.listdir(models_dir)
+        gguFs = sorted(f for f in files
+                       if f.lower() == raw.lower() and f.lower().endswith(".gguf"))
+        if gguFs:
+            return os.path.join(models_dir, gguFs[0])
+        # não achou nome exato -> tenta como ID base do modelo
+        # (ex: "Qwythos-9B-Claude-Mythos-5-1M-uncensored-heretic" ->
+        #  qualquer .gguf em models/ que contenha esse ID)
+        gguFs = sorted(f for f in files
+                       if raw in f and f.lower().endswith(".gguf"))
+        return os.path.join(models_dir, gguFs[0]) if len(gguFs) == 1 else raw
+
+    @staticmethod
     def _as_int(dotenv: dict[str, str], key: str, default: int) -> int:
         raw = dotenv.get(key, "")
         if raw == "":
@@ -127,20 +175,12 @@ class Config:
 
         # MODELO (default: models\ dentro do projeto)
         self.ALIAS: str = self._get(dotenv, "ALIAS", "Qwythos-9B")
-        self.MODEL_PATH: str = self._get(
-            dotenv, "MODEL_PATH",
-            os.path.join(self.BASE_DIR, "models",
-                         "Qwythos-9B-Claude-Mythos-5-1M-uncensored-"
-                         "heretic-Q8_0.gguf"),
-        )
+        # MODEL_PATH vazio = auto-detecta o .gguf da pasta models/
+        # (troque o modelo apenas GARANTINDO que haja UM .gguf; sem erro)
+        self.MODEL_PATH: str = self._resolve_model(dotenv)
 
         # VISÃO (mmproj) — 1 = carrega | 0 = só texto
-        self.MM_PROJ_PATH: str = self._get(
-            dotenv, "MM_PROJ_PATH",
-            os.path.join(self.BASE_DIR, "tools", "visao",
-                         "Qwythos-9B-Claude-Mythos-5-1M-uncensored-"
-                         "heretic-mmproj-BF16.gguf"),
-        )
+        self.MM_PROJ_PATH: str = self._resolve_mmproj(dotenv)
         self.MM_PROJ_ENABLED: bool = self._as_bool(dotenv,
                                                    "MM_PROJ_ENABLED", False)
         self.IMG_MIN_TOKENS: int = self._as_int(dotenv, "IMG_MIN_TOKENS",
@@ -156,6 +196,17 @@ class Config:
         self.CTX: int = self._as_int(dotenv, "CTX", 409600)  # mult. de 256
         self.BATCH: int = self._as_int(dotenv, "BATCH", 1024)
         self.UBATCH: int = self._as_int(dotenv, "UBATCH", 512)
+        # FLASH ATTENTION (on|off|auto): reduz a VRAM do KV e acelera o
+        # prompt processing — recomendado para 16 GB com CTX grande.
+        self.FLASH_ATTN: str = self._get(dotenv, "FLASH_ATTN",
+                                         "on").lower()
+        # PARALLEL: nº de slots do servidor. Para uso solo no Cline, 1
+        # slot concentra todo o CTX numa conversa (sem fragmentar).
+        self.PARALLEL: int = self._as_int(dotenv, "PARALLEL", 1)
+        # KV_CACHE_TYPE: quantização do cache KV (q8_0|f16...). Q8_0
+        # ~metade da VRAM com perda mínima — ideal em 16 GB.
+        self.KV_CACHE_TYPE: str = self._get(dotenv, "KV_CACHE_TYPE",
+                                            "q8_0").lower()
 
         # SAMPLING (None = não envia a flag ao llama-server)
         self.TEMP: float | None = self._as_opt(dotenv, "TEMP", float, 0.7)
@@ -177,6 +228,11 @@ class Config:
         self.LOG_LEVEL: str = self._get(dotenv, "LOG_LEVEL", "INFO")
         self.SHOW_CONFIG_ON_BOOT: bool = self._as_bool(
             dotenv, "SHOW_CONFIG_ON_BOOT", True)
+
+        # RACIOCÍNIO (<think>): on | off | auto — "off" desliga o
+        # thinking p/ todas as requisições (igual ao benchmark 9/10;
+        # o default "auto" do llama.cpp degradava o tool calling no Cline)
+        self.REASONING: str = self._get(dotenv, "REASONING", "off").lower()
 
     # --------------------------------------------------------
     # Propriedades calculadas

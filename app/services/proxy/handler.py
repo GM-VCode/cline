@@ -6,14 +6,14 @@
 # ============================================================
 
 import json
-import time
 import urllib.error
-import uuid
 from http.server import BaseHTTPRequestHandler
 from typing import TYPE_CHECKING
 from urllib.request import Request, urlopen
 
 from app.agent.debug import get_agent_logger
+from app.services.proxy.recorder import ProxyRecorder
+from app.services.proxy.runstate import StreamProbe
 from app.services.proxy.sessions import SessionRegistry
 
 if TYPE_CHECKING:  # anotação só para o editor (não roda em runtime)
@@ -45,9 +45,11 @@ class ProxyHandler(BaseHTTPRequestHandler):
         self.wfile.write(data)
 
     # ---------- relay ----------
-    def _relay_upstream(self, raw: bytes | None = None) -> None:
+    def _relay_upstream(self, raw: bytes | None = None,
+                        probe: StreamProbe | None = None) -> None:
         """Repassa ao llama-server e devolve o corpo ao Cline.
-        HTTPError (4xx/5xx) é repassado como veio, sem virar 502."""
+        HTTPError (4xx/5xx) é repassado como veio, sem virar 502.
+        ``probe`` (opcional) analisa o streaming sem guardar o corpo."""
         headers = {k: v for k, v in self.headers.items()
                    if k.lower() not in self.SKIP_HEADERS}
         headers["Accept-Encoding"] = "identity"
@@ -72,6 +74,11 @@ class ProxyHandler(BaseHTTPRequestHandler):
                 chunk = reader(65536)
                 if not chunk:
                     break
+                if probe is not None:
+                    try:
+                        probe.feed(chunk)
+                    except Exception:  # nunca deixa o probe quebrar o fluxo
+                        pass
                 self.wfile.write(chunk)
                 self.wfile.flush()
         finally:
@@ -94,52 +101,28 @@ class ProxyHandler(BaseHTTPRequestHandler):
             body = json.loads(raw) if raw else {}
         except ValueError:
             body = {}
+        recorder = ProxyRecorder(self.store, self.sessions)
         # memória: registra antes de repassar (nunca quebra o proxy)
-        if self.store is not None and self.sessions is not None:
+        if body:
             try:
-                self._record(body)
+                recorder.record_request(body)
             except Exception as exc:
                 log = get_agent_logger()
                 if log:
                     log.warn(f"proxy: falha ao registrar memória: {exc}")
+        probe = StreamProbe()
         try:
-            self._relay_upstream(raw)
+            self._relay_upstream(raw, probe=probe)
+            # resposta do modelo: atualiza a máquina de estados (tool/stop)
+            if body:
+                try:
+                    recorder.record_response(body, *probe.snapshot())
+                except Exception as exc:
+                    log = get_agent_logger()
+                    if log:
+                        log.warn(f"proxy: falha ao registrar resposta: {exc}")
         except Exception as exc:
             log = get_agent_logger()
             if log:
                 log.warn(f"proxy: falha ao repassar ao upstream: {exc}")
             self._send_json(502, {"error": f"upstream: {exc}"})
-
-    # ---------- memória ----------
-    def _record(self, body: dict) -> None:
-        if self.store is None or self.sessions is None:
-            return
-        sess = self.sessions.touch(body)
-        instr = SessionRegistry.first_user_text(body.get("messages"))
-        if not instr:
-            return
-        now = time.strftime("%Y-%m-%dT%H:%M:%S")
-        self.store.save_state({
-            "objective": instr[:500],
-            "source": "cline-proxy",
-            "status": "in_progress",
-            "started_at": sess.get("first_seen", now),
-            "updated_at": now,
-            "requests": sess.get("count", 1),
-        }, task_id=sess["sid"])
-        self.store.append_agent_run({
-            "instruction": instr[:500],
-            "source": "cline-proxy",
-            "run_id": uuid.uuid4().hex[:8],
-            "finished": False,
-            "attempts": 1,
-            "retries": 0,
-            "files": [],
-            "elapsed_s": None,
-            "error": "",
-        }, task_id=sess["sid"])
-        log = get_agent_logger()
-        if log:
-            log.info(f"proxy: gravado task_id={sess['sid']} "
-                     f"(tasks->{self.store.state.last_backend}, "
-                     f"agent_runs->{self.store.agent_runs.last_backend})")

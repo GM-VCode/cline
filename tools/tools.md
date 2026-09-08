@@ -65,17 +65,25 @@ Ver histórico:
 
 ---
 
-## 3. Logger centralizado — `logger.py`
+## 3. Logger centralizado — `logger/` (pacote, ex-`logger.py`)
 
-class **`AppLogger`**: logs com **niveles** a `logs/app.log` + consola.
+class **`AppLogger`** (`tools/logger/`): logs com **níveis** + console,
+e **arquivo exclusivo por nível** no log principal.
 
-| Nivel | Valor |
-|---|---|
-| `DEBUG` | 10 |
-| `INFO` | 20 |
-| `WARN` | 30 |
-| `ERROR` | 40 |
-| `CRITICAL` | 50 |
+| Nivel | Valor | Arquivo (log principal) |
+|---|---|---|
+| `DEBUG` | 10 | `logs/debug.log` |
+| `INFO` | 20 | `logs/info.log` |
+| `WARN` | 30 | `logs/warn.log` |
+| `ERROR` | 40 | `logs/error.log` |
+| `CRITICAL` | 50 | `logs/critical.log` |
+
+- Log principal (sem `path=` explícito): cada registro vai **somente**
+  para o arquivo do seu nível — nada fica mais misturado no `app.log`.
+- Com `path=` explícito (`agent.log`, tests): arquivo único como antes.
+- Módulos: `levels` (LogLevel) · `sanitizer` (SecretSanitizer) ·
+  `formatter` (LogFormatter) · `rotator` (LogRotator) ·
+  `writer` (LogWriter) · `app_logger` (AppLogger).
 
 Nível mínimo configurable via `.env` (`LOG_LEVEL`, default `INFO`). Métodos:
 `debug()` · `info()` · `warn()` · `error()` · `critical()`.
@@ -83,8 +91,11 @@ Nível mínimo configurable via `.env` (`LOG_LEVEL`, default `INFO`). Métodos:
 ```python
 from tools.logger import AppLogger
 log = AppLogger("mi_modulo")   # nível do .env (INFO por default)
-log.info("mensaje")            # DEBUG se filtra si LOG_LEVEL=INFO
+log.info("mensaje")            # vai para logs/info.log (+ console)
 ```
+
+Saída legível do modelo (agente/benchmark): **`logs/saida-modelo.log`** —
+via `app/agent/debug.py::get_model_logger` (resposta bruta + interpretação).
 
 ---
 

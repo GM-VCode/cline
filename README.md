@@ -48,14 +48,40 @@ Cline (VS Code) → proxy (:8081) → llama-server (:8080)
         MongoDB (cline_agent): tasks + agent_runs
 ```
 
-1. 🖱️ Suba o servidor normalmente (atalho `INICIAR-Qwythos-9B`)
+### 🗺️ Quem é quem nas portas (são 2 processos separados!)
+
+| Porta | Processo | Como sobe |
+|---|---|---|
+| `:8080` | **llama-server** (o modelo) | Atalho `INICIAR-Qwythos-9B` — **deixe a janela aberta** (fechar/`Ctrl+C` = o modelo cai) |
+| `:8081` | **proxy de memória** | cmd próprio: `python tools\proxy.py` (fica rodando; `Ctrl+C` para parar) |
+
+> ⚠️ O bat **não** sobe o proxy — são duas janelas: a do bat (modelo) e a do cmd (proxy).
+
+1. 🖱️ Suba o servidor pelo atalho e **deixe a janela aberta**
 2. 🧠 Abra um cmd na pasta do projeto e rode: `python tools\proxy.py`
-   (fica rodando; `Ctrl+C` para parar)
 3. 🔌 No Cline, troque só a **Base URL** para `http://127.0.0.1:8081/v1`
    (API Key e Model ID continuam iguais)
+   > 💥 **Falha clássica do teste:** Base URL em `:8080` → o tráfego vai
+   > direto ao servidor, o proxy nunca vê nada e **nada é gravado**.
 
-Cada conversa vira 1 doc em `tasks` e cada requisição 1 doc em `agent_runs`
-(db `cline_agent`; sem Mongo ativo, cai para JSON em `data\json\`).
+### 📥 Quando grava? Na hora — cada requisição
+
+Não espera a tarefa "concluir": **cada requisição** do Cline é gravada
+**antes** de ser repassada ao modelo — 1 doc em `tasks` (com `requests`
+incrementando e `status: in_progress`) + 1 doc em `agent_runs` (com
+`source: cline-proxy` e a instrução da 1ª mensagem). Sem Mongo ativo,
+cai para JSON em `data\json\`.
+
+### ✅ Como conferir se gravou
+
+⚠️ O proxy grava com `task_id` = **ID da sessão do Cline** (não `current`),
+então `memory.py agent-runs` (que filtra por `current`) **não lista** os
+registros do proxy. Consulte o Mongo direto, sem filtro:
+
+```bash
+.venv\Scripts\python.exe -c "import pymongo; db = pymongo.MongoClient('mongodb://localhost:27017')['cline_agent']; [print(d) for d in db.agent_runs.find({}, {'_id': 0, 'source': 1, 'instruction': 1}).sort('_id', -1).limit(5)]"
+```
+
 Feche o proxy e volte a Base URL para `http://127.0.0.1:8080/v1` para
 voltar ao modo direto (sem registro).
 
@@ -212,7 +238,12 @@ Toda a lógica de BD vive modularizada em `data/mongodb/`.
 .venv\Scripts\python.exe data\mongodb\scripts\init_mongo.py
 .venv\Scripts\python.exe data\mongodb\scripts\memory.py state
 .venv\Scripts\python.exe data\mongodb\scripts\memory.py validations 10
+.venv\Scripts\python.exe data\mongodb\scripts\memory.py conversa <task_id>
 ```
+
+`memory.py conversa <id>` mostra a **timeline completa** de uma conversa do proxy
+(máquina de estados: `in_progress` → `turn_finished` → `completed`/`failed`,
+com eventos `user_request`/`model_tool`/`model_final`/`auto_complete`/`user_reopen`).
 
 `validate.py` registra automaticamente cada corrida em `validations`.
 Dependência **opcional** (`pymongo`); se não está, tudo segue igual em modo JSON.
@@ -229,6 +260,7 @@ Dependência **opcional** (`pymongo`); se não está, tudo segue igual em modo J
 |---|:---|---|
 | `MODEL_PATH` | `C:\...\models\Qwythos-...-Q8_0.gguf` | Caminho do `.gguf` a carregar |
 | `ALIAS` | `LunarIA` | Nome que o Cline vê como **Model ID** |
+| `REASONING` | `off` | **Desliga o `<think>`** (default, recomendado p/ Cline) · `on` = liga · `auto` = detecção do llama.cpp. Com thinking ligado, tool calls longos truncam e o Cline degrada |
 
 ### 🖼️ Visão (módulo mmproj)
 
@@ -332,4 +364,6 @@ taskkill /f /im llama-server.exe
 | Erro de contexto no Cline | Servidor não está rodando — inicie pelo atalho |
 | Cline não manda imagens 🖼️ | Reabra o VS Code / re-adicione o provider (cache "text-only") |
 | Porta 8080 ocupada | Mude `PORT` no `.env` (e a Base URL no Cline) |
+| Proxy não grava nada no Mongo | Base URL do Cline está em `:8080` (tem que ser `:8081`) **ou** o proxy não está rodando — suba `python tools\proxy.py` |
+| Modelo degradando (pastas com nomes estranhos, código embaralhado, vários terminais) | thinking (`<think>`) ligado trunca tool calls longos — o default já é `REASONING=off`; se mexeu no `.env`, volte para `off` e reinicie |
 | Ver logs detalhados | `C:\llama.cpp\server.err.log` |

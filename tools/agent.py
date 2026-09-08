@@ -3,7 +3,7 @@
 #  CLI do agente real: roda uma instrução num projeto com o
 #  modelo local e valida com um comando de verificação.
 #
-#  Uso:
+#  Uso (--check é OBRIGATORIO):
 #    python tools/agent.py --project <dir> --instruction "..."
 #                          --check "python -m pytest -q"
 # ============================================================
@@ -36,9 +36,11 @@ class AgentCLI:
                        help="diretório do projeto alvo")
         p.add_argument("--instruction", required=True,
                        help="o que o modelo deve fazer")
-        p.add_argument("--check", default="",
-                       help="comando de verificação (string; "
-                            "executado via shell no projeto)")
+        p.add_argument("--check",
+                       required=True,
+                       help="comando de verificação (string; obrigatório — "
+                            "executado via shell no projeto; sem --check "
+                            "o agente não pode auto-validar e se recusa)")
         p.add_argument("--max-attempts", type=int, default=2)
         p.add_argument("--max-actions", type=int, default=None,
                        help="ativa modo iterativo (ação->observação, "
@@ -73,7 +75,11 @@ class AgentCLI:
                       f"({store.error})", log)
 
     def run(self) -> int:
-        check_cmd = self.args.check.split() if self.args.check else []
+        check_cmd = self.args.check.split() if (self.args.check or "").strip() else []
+        if not check_cmd:
+            print("ERRO: --check é obrigatório (comando de verificação).",
+                  file=sys.stderr)
+            return 2
         executor = LlamaExecutor(temperature=self.args.temperature)
         identity = None if self.args.no_identity else AgentIdentity()
         log = get_agent_logger()

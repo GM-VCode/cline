@@ -32,8 +32,22 @@ class LlamaServer:
         c = self.cfg
         if not os.path.isfile(c.LLAMA_SERVER):
             problems.append(f"llama-server.exe não encontrado: {c.LLAMA_SERVER}")
-        if not os.path.isfile(c.MODEL_PATH):
+        if not c.MODEL_PATH:
+            problems.append(
+                "MODEL_PATH vazio: não encontrei UM único .gguf em "
+                f"{ProjectPath.MODELS_DIR} (tenha exatamente 1 modelo "
+                "na pasta, ou defina MODEL_PATH no .env)")
+        elif not os.path.isfile(c.MODEL_PATH):
             problems.append(f"Modelo não encontrado: {c.MODEL_PATH}")
+            try:
+                exist = [f for f in os.listdir(ProjectPath.MODELS_DIR)
+                         if f.lower().endswith(".gguf")]
+                if exist:
+                    problems.append(
+                        "Modelos disponíveis em "
+                        f"{ProjectPath.MODELS_DIR}: {', '.join(exist)}")
+            except OSError:
+                pass
         if c.MM_PROJ_ENABLED and c.MM_PROJ_PATH:
             if not os.path.isfile(c.MM_PROJ_PATH):
                 problems.append(
@@ -43,6 +57,9 @@ class LlamaServer:
             problems.append("MM_PROJ_ENABLED=1 mas MM_PROJ_PATH está vazio")
         if c.CTX % 256 != 0:
             problems.append(f"CTX ({c.CTX}) deveria ser múltiplo de 256")
+        if str(c.REASONING).lower() not in ("on", "off", "auto"):
+            problems.append(
+                f"REASONING inválido: {c.REASONING} (use on | off | auto)")
         for name, val in (("TOP_K", c.TOP_K), ("TOP_P", c.TOP_P), ("MIN_P", c.MIN_P)):
             if val is not None and val <= 0:
                 problems.append(f"{name} deve ser positivo (recebido: {val})")
@@ -79,6 +96,17 @@ class LlamaServer:
             args += ["--repeat-penalty", str(c.REPEAT_PENALTY)]
         if c.SEED is not None:
             args += ["--seed", str(c.SEED)]
+        # RACIOCÍNIO (<think>): -rea on|off|auto. Default "off" p/ o Cline
+        # (thinking ligado truncava tool calls longos e degradava a saída)
+        args += ["-rea", str(c.REASONING).lower()]
+        # FLASH ATTENTION: reduz a VRAM do KV cache (crítico p/ 16 GB)
+        if c.FLASH_ATTN in ("on", "off", "auto"):
+            args += ["-fa", c.FLASH_ATTN]
+        # PARALLEL: nº de slots — 1 concentra todo o CTX (uso solo no Cline)
+        args += ["--parallel", str(c.PARALLEL)]
+        # KV CACHE QUANTIZADA: q8_0 = ~metade da VRAM com perda mínima
+        if c.KV_CACHE_TYPE:
+            args += ["-ctk", c.KV_CACHE_TYPE, "-ctv", c.KV_CACHE_TYPE]
         # VISION: carrega o módulo de visão (-mm) se estiver ativo
         if c.MM_PROJ_ENABLED:
             args += ["-mm", c.MM_PROJ_PATH]

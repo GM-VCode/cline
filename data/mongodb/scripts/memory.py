@@ -72,6 +72,25 @@ class MemoryCli:
             print(f"      instr: {str(r.get('instruction', ''))[:80]}")
         return 0
 
+    def _conversa(self, sid: str) -> int:
+        """Mostra a timeline completa de UMA conversa (event sourcing)."""
+        doc = self.store.get_agent_run(sid)
+        if doc is None:
+            print(f"Nenhuma conversa com task_id={sid!r}.")
+            print("Dica: use `agent-runs` ou consulte o Mongo por 'source: cline-proxy'.")
+            return 1
+        print(f"=== CONVERSA {sid} ===")
+        print(f"status     : {doc.get('status')}  (finished={doc.get('finished')})")
+        print(f"requests   : {doc.get('requests_count')}")
+        print(f"instr      : {str(doc.get('instruction', ''))[:120]}")
+        print(f"finish_reason (último): {doc.get('last_finish_reason')}")
+        print("timeline:")
+        for ev in doc.get("timeline", []) or []:
+            print(f"  [{ev.get('ts', '?')}] {ev.get('tipo', '?')}: "
+                  f"{ev.get('nota', '')}"
+                  + (f" ({ev.get('detalhe', '')})" if ev.get("detalhe") else ""))
+        return 0
+
     def run(self, argv) -> int:
         cmd = argv[0] if argv else "state"
         if cmd == "state":
@@ -85,7 +104,12 @@ class MemoryCli:
         if cmd == "agent-runs":
             limit = int(argv[1]) if len(argv) > 1 else 20
             return self._agent_runs(limit)
-        print("Uso: memory.py [state|validations|diagnostics|agent-runs [N]]")
+        if cmd == "conversa":
+            if len(argv) < 2:
+                print("Uso: memory.py conversa <task_id>")
+                return 2
+            return self._conversa(argv[1])
+        print("Uso: memory.py [state|validations|diagnostics|agent-runs|conversa <id>]")
         return 2
 
 

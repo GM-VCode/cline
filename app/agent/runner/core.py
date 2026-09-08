@@ -111,22 +111,15 @@ class AgentRunner:
         }
 
     def _record(self, instruction: str, project_dir: str, result: dict):
-        """Registra a execução na memória (Mongo/JSON), se store configurado."""
+        """Registra o estado da tarefa (coleção tasks + data/json/task-state.json).
+
+        NOTA: agent_runs é gerenciado SOMENTE pelo proxy (ProxyRecorder).
+        O AgentRunner não escreve em agent_runs — só reporta o resultado via
+        save_state, que é a coleção de estado da tarefa.
+        """
         if self.store is None:
             return
         try:
-            self.store.append_agent_run({
-                "instruction": instruction[:500],
-                "project": project_dir,
-                "finished": result.get("finished"),
-                "attempts": result.get("attempts"),
-                "retries": result.get("retries"),
-                "internal_runs": result.get("internal_runs", 0),
-                "files": result.get("files_written", []),
-                "elapsed_s": result.get("elapsed_s"),
-                "error": (result.get("error") or "")[:300],
-            })
-            # estado da tarefa (coleção tasks + data/json/task-state.json)
             self.store.save_state({
                 "objective": instruction[:500],
                 "project": project_dir,
@@ -145,13 +138,13 @@ class AgentRunner:
             log = get_agent_logger()
             if log:
                 log.info(
-                    "memória OK: agent_runs->{} tasks->{} (task_id={}, db={})"
-                    .format(getattr(getattr(self.store, "agent_runs", None),
-                                    "last_backend", "?"),
-                            getattr(getattr(self.store, "state", None),
-                                    "last_backend", "?"),
-                            getattr(self.store, "task_id", "?"),
-                            getattr(self.store, "db_name", "?")))
+                    "memória OK: tasks->{} (task_id={}, db={})"
+                    .format(
+                        getattr(getattr(self.store, "state", None),
+                                "last_backend", "?"),
+                        getattr(self.store, "task_id", "?"),
+                        getattr(self.store, "db_name", "?"),
+                    ))
         except Exception as exc:  # memória nunca quebra o agente
             log = get_agent_logger()
             if log:

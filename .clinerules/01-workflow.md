@@ -104,6 +104,22 @@ Priorize: sistema → objetivo → estrutura → arquivos relacionados → inter
 
 Escolha a alternativa mais conservadora e reversível; registre a suposição. Não adicione dependências, frameworks ou serviços sem necessidade real. Não transforme uma tarefa pequena em uma reescrita.
 
+## 15. Auto-validação antes de entregar (OBRIGATORIO)
+
+Aplica a **qualquer** tarefa de código (Cline, agente, benchmark, proxy):
+
+1. **Antes de declarar "pronto/completo", execute** o que você acaba de criar ou editar: rode o teste ou comando de verificação do próprio projeto. Não baste dizer que "deveria funcionar".
+
+1. **Sequência mínima de entrega:** criar/editar → executar → **corrigir o erro real** → re-executar → só então entregar.
+
+1. **Nunca repita** o mesmo comando que já falhou igual: mude a abordagem ou explique o bloqueo (use `BLOQUEADO: <motivo>`).
+
+1. **Nunca peça validação ao usuário como parte da entrega.** Se o check falha, corrija e re-teste. O usuário não é runner de testes.
+
+1. Se não existe comando de verificação (projeto sem tests), execute ao menos un smoke que demonstre que funciona (import, `--help`, run mínimo). Documente o que rodó e a saída.
+
+1. O estado da tarefa deve refletir isso: em `data/json/task-state.json` registre `tests_run` com o comando real e seu resultado; `known_failures` vazio o explicado.
+
 ---
 
 ## Critério de aceitação (ponta a ponta)

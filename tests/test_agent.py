@@ -101,23 +101,26 @@ class TestAgentRunner(unittest.TestCase):
     def test_store_registra_execucao(self):
         class FakeStore:
             def __init__(self):
-                self.entries = []
+                self.states = []
+                self.task_id = "t1"
+                self.db_name = "testdb"
 
-            def append_agent_run(self, entry, task_id=None):
-                self.entries.append(entry)
-                return entry
+                class _State:
+                    last_backend = "fake"
+                self.state = _State()
 
             def save_state(self, payload, task_id=None):
+                self.states.append(payload)
                 return payload
 
         store = FakeStore()
         runner = AgentRunner(FakeExecutor(bug_antes=False),
                              check_cmd=self.check, store=store)
         runner.run("conserte add", self.dir)
-        self.assertEqual(len(store.entries), 1)
-        e = store.entries[0]
-        self.assertTrue(e["finished"])
-        self.assertEqual(e["files"], ["calc.py"])
+        self.assertEqual(len(store.states), 1)
+        e = store.states[0]
+        self.assertEqual(e["status"], "completed")
+        self.assertEqual(e["last_result"]["files"], ["calc.py"])
 
     def test_sem_store_nao_registra_nada(self):
         runner = AgentRunner(FakeExecutor(bug_antes=False),

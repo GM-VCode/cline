@@ -92,6 +92,13 @@ class TestBuildArgs(unittest.TestCase):
         self.assertNotIn("-mm", args)
         self.assertNotIn("--image-min-tokens", args)
 
+    def test_reasoning_flag_padrao_off_e_configuravel(self):
+        args = LlamaServer(make_config()).build_args()
+        self.assertIn("-rea", args)
+        self.assertIn("off", args)
+        args_on = LlamaServer(make_config(REASONING="on")).build_args()
+        self.assertIn("on", args_on)
+
 
 class TestValidate(unittest.TestCase):
     def _config_con_archivos_reales(self, **overrides):
@@ -141,6 +148,12 @@ class TestValidate(unittest.TestCase):
         write_file(mm)
         cfg.MM_PROJ_PATH = mm
         LlamaServer(cfg).validate()  # no levanta
+
+    def test_reasoning_invalido_falla(self):
+        cfg = self._config_con_archivos_reales(REASONING="x")
+        with self.assertRaises(SystemExit) as ctx:
+            LlamaServer(cfg).validate()
+        self.assertEqual(ctx.exception.code, 1)
 
 
 if __name__ == "__main__":

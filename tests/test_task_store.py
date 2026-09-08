@@ -75,6 +75,125 @@ class TestAgentRuns(BaseTaskStoreTest):
         self.assertTrue(os.path.isfile(path))
 
 
+class TestAgentRunsUpsert(BaseTaskStoreTest):
+    """Upsert: 1 documento por conversa (task_id), sem duplicatas."""
+
+    def test_upsert_atualiza_mesmo_doc_da_mesma_conversa(self):
+        s = self.make()
+        s.upsert_agent_run({"instruction": "missao X", "status": "in_progress",
+                            "requests_count": 1, "run_id": "sid-1"},
+                           task_id="sid-1")
+        s.upsert_agent_run({"instruction": "missao X", "status": "in_progress",
+                            "requests_count": 2, "run_id": "sid-1"},
+                           task_id="sid-1")
+        s.upsert_agent_run({"instruction": "missao X", "status": "in_progress",
+                            "requests_count": 3, "run_id": "sid-1"},
+                           task_id="sid-1")
+        runs = s.list_agent_runs(limit=10, task_id="sid-1")
+        self.assertEqual(len(runs), 1, "não pode acumular duplicatas")
+        self.assertEqual(runs[0]["requests_count"], 3)
+        self.assertEqual(runs[0]["status"], "in_progress")
+        self.assertEqual(runs[0]["instruction"], "missao X")
+        s.close()
+
+    def test_upsert_nao_mistura_conversas_diferentes(self):
+        s = self.make()
+        s.upsert_agent_run({"instruction": "A", "requests_count": 1},
+                           task_id="conv-a")
+        s.upsert_agent_run({"instruction": "B", "requests_count": 1},
+                           task_id="conv-b")
+        s.upsert_agent_run({"instruction": "A", "requests_count": 2},
+                           task_id="conv-a")
+        runs_a = s.list_agent_runs(limit=10, task_id="conv-a")
+        runs_b = s.list_agent_runs(limit=10, task_id="conv-b")
+        self.assertEqual(len(runs_a), 1)
+        self.assertEqual(len(runs_b), 1)
+        self.assertEqual(runs_a[0]["requests_count"], 2)
+        self.assertEqual(runs_b[0]["requests_count"], 1)
+        self.assertEqual(runs_a[0]["instruction"], "A")
+        self.assertEqual(runs_b[0]["instruction"], "B")
+        s.close()
+
+    def test_upsert_sobrescreve_campos_e_atualiza_ts(self):
+        s = self.make()
+        s.upsert_agent_run({"instruction": "v1", "status": "in_progress",
+                            "error": ""}, task_id="sid-9")
+        s.upsert_agent_run({"instruction": "v1", "status": "completed",
+                            "error": "resolvido"}, task_id="sid-9")
+        runs = s.list_agent_runs(limit=10, task_id="sid-9")
+        self.assertEqual(len(runs), 1)
+        self.assertEqual(runs[0]["status"], "completed")
+        self.assertEqual(runs[0]["error"], "resolvido")
+        self.assertIn("last_update", runs[0])
+        s.close()
+
+    def test_upsert_doc_com_created_at_nao_falha_no_mongo(self):
+        """Regressão: doc do runstate vem com 'created_at'; o $set não pode
+        conflitar com o $setOnInsert (derrubava tudo p/ fallback JSON)."""
+        s = self.make()
+        s.upsert_agent_run({"instruction": "oi", "status": "in_progress",
+                            "created_at": "2026-09-08T20:00:00",
+                            "last_seen_at": 1788904000.0},
+                           task_id="sid-created")
+        s.upsert_agent_run({"instruction": "oi", "status": "completed",
+                            "created_at": "2026-09-08T20:00:00",
+                            "last_seen_at": 1788904100.0},
+                           task_id="sid-created")
+        runs = s.list_agent_runs(limit=10, task_id="sid-created")
+        self.assertEqual(len(runs), 1)
+        self.assertEqual(runs[0]["status"], "completed")
+        self.assertEqual(runs[0]["created_at"], "2026-09-08T20:00:00")
+        s.close()
+
+    def test_upsert_event_acumula_timeline(self):
+        s = self.make()
+        tid = "sid-timeline"
+        s.upsert_agent_run({"instruction": "missao", "status": "in_progress"},
+                           task_id=tid,
+                           event={"tipo": "user_request", "ts": "t1",
+                                  "nota": "pediu"})
+        s.upsert_agent_run({"instruction": "missao", "status": "in_progress"},
+                           task_id=tid,
+                           event={"tipo": "model_tool", "ts": "t2",
+                                  "nota": "ferramenta"})
+        s.upsert_agent_run({"instruction": "missao", "status": "turn_finished"},
+                           task_id=tid,
+                           event={"tipo": "model_final", "ts": "t3",
+                                  "nota": "respondeu"})
+        runs = s.list_agent_runs(limit=10, task_id=tid)
+        self.assertEqual(len(runs), 1, "não pode duplicar com timeline")
+        timeline = runs[0].get("timeline") or []
+        self.assertEqual([e["tipo"] for e in timeline],
+                         ["user_request", "model_tool", "model_final"])
+        self.assertEqual(timeline[-1]["nota"], "respondeu")
+        s.close()
+
+    def test_upsert_primeiro_event_cria_timeline(self):
+        s = self.make()
+        tid = "sid-novo"
+        s.upsert_agent_run({"instruction": "missao", "status": "in_progress"},
+                           task_id=tid,
+                           event={"tipo": "user_request", "ts": "t0",
+                                  "nota": "primeiro"})
+        runs = s.list_agent_runs(limit=10, task_id=tid)
+        self.assertEqual(len(runs), 1)
+        self.assertEqual((runs[0].get("timeline") or [])[0]["tipo"],
+                         "user_request")
+        s.close()
+
+    def test_get_agent_run_retorna_doc_ou_none(self):
+        s = self.make()
+        self.assertIsNone(s.get_agent_run("nao-existe"))
+        s.upsert_agent_run({"instruction": "x", "status": "in_progress"},
+                           task_id="sid-get")
+        doc = s.get_agent_run("sid-get")
+        self.assertIsNotNone(doc)
+        assert doc is not None  # p/ o type checker
+        self.assertEqual(doc["task_id"], "sid-get")
+        self.assertEqual(doc["instruction"], "x")
+        s.close()
+
+
 class TestValidations(BaseTaskStoreTest):
     def test_append_y_list(self):
         s = self.make()

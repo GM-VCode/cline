@@ -7,7 +7,8 @@ llama-server carrega.
 
 | Arquivo | Tamanho aprox. | Descrição |
 |---|---|---|
-| `Qwythos-9B-Claude-Mythos-5-1M-uncensored-heretic-Q8_0.gguf` | ~10 GB | Modelo principal — quantização Q8_0 (8 bits, qualidade quase igual ao FP16) |
+| `Qwythos-9B-Claude-Mythos-5-1M-uncensored-heretic-Q8_0.gguf` | ~10 GB | Quantização Q8_0 (8 bits, qualidade quase igual ao FP16) |
+| `Qwythos-9B-Claude-Mythos-5-1M-uncensored-heretic-Q6_K.gguf` | ~7 GB | Quantização Q6_K (6 bits, mais leve / menos VRAM) — **este é o que está ativo no `.env` agora (MODEL_PATH aponta para ele)** |
 
 ## Sobre o modelo
 

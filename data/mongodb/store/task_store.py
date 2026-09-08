@@ -104,6 +104,21 @@ class TaskStore:
                          task_id: str | None = None) -> dict:
         return self.agent_runs.append(entry, task_id=task_id)
 
+    def upsert_agent_run(self, entry: dict, task_id: str | None = None,
+                         event: dict | None = None) -> dict:
+        """1 documento por conversa: atualiza o doc do task_id ou cria.
+
+        Mantém o agente_runs limpo (sem duplicatas por request). É a forma
+        usada pelo proxy, em que toda requisição da mesma conversa
+        sobrescreve o mesmo registro com status atualizado. ``event``
+        (opcional) é anexado à timeline da conversa (event sourcing).
+        """
+        return self.agent_runs.upsert(entry, task_id=task_id, event=event)
+
+    def get_agent_run(self, task_id: str | None = None) -> dict | None:
+        """Documento único da conversa no agent_runs (ou None)."""
+        return self.agent_runs.get_one(task_id)
+
     def list_agent_runs(self, limit: int = 20,
                         task_id: str | None = None) -> list:
         return self.agent_runs.list(limit, task_id=task_id)

@@ -5,10 +5,62 @@
 # ============================================================
 
 import os
+import shutil
 import tempfile
 import unittest
 
 from app.config import Config
+
+
+class TestResolveModel(unittest.TestCase):
+    """Auto-detecção do .gguf (MODEL_PATH vazio = detecta na pasta)."""
+
+    def setUp(self):
+        self.dir = tempfile.mkdtemp(prefix="models_")
+        self.addCleanup(shutil.rmtree, self.dir, ignore_errors=True)
+
+    def _write(self, name):
+        path = os.path.join(self.dir, name)
+        with open(path, "w", encoding="utf-8") as f:
+            f.write("x")
+        return path
+
+    def test_usa_model_path_do_env_se_preenchido(self):
+        env = {"MODEL_PATH": r"C:\models\meu.gguf"}
+        self.assertEqual(Config._resolve_model(env), r"C:\models\meu.gguf")
+
+    def test_detecta_unico_gguf_quando_env_vazio(self):
+        from project_path import ProjectPath
+        env = {}
+        orig = ProjectPath.MODELS_DIR
+        ProjectPath.MODELS_DIR = self.dir
+        try:
+            self._write("modelo.gguf")
+            result = Config._resolve_model(env)
+            self.assertTrue(result.endswith("modelo.gguf"), result)
+            self.assertEqual(result, os.path.join(self.dir, "modelo.gguf"))
+        finally:
+            ProjectPath.MODELS_DIR = orig
+
+    def test_vazio_quando_nao_ha_gguf(self):
+        from project_path import ProjectPath
+        orig = ProjectPath.MODELS_DIR
+        ProjectPath.MODELS_DIR = self.dir
+        try:
+            self.assertEqual(Config._resolve_model({}), "")
+        finally:
+            ProjectPath.MODELS_DIR = orig
+
+    def test_vazio_quando_ha_mais_de_um_gguf(self):
+        from project_path import ProjectPath
+        orig = ProjectPath.MODELS_DIR
+        ProjectPath.MODELS_DIR = self.dir
+        try:
+            self._write("a.gguf")
+            self._write("b.gguf")
+            self.assertEqual(Config._resolve_model({}), "")
+        finally:
+            ProjectPath.MODELS_DIR = orig
 
 
 class TestLoadDotenv(unittest.TestCase):
