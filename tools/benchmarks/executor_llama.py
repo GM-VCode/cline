@@ -39,6 +39,7 @@ class LlamaExecutor(ModelExecutor):
                  retry_temperature: float = 0.7):
         self.url = url
         self.temperature = temperature
+        self._defer_apply = False
         self.max_tokens = max_tokens
         self.enable_thinking = enable_thinking
         # temperatura maior no retry: prompt idêntico com temperature baixa
@@ -123,14 +124,19 @@ class LlamaExecutor(ModelExecutor):
 
     def execute_action(self, instruction: str, project_dir: str,
                        history: list) -> dict:
-        """11c: um passo por vez; histórico de observações no feedback."""
+        """11c: um passo por vez; histórico de observações no feedback.
+        NÃO aplica nada — quem aplica é o ActionLoop (evita dupla aplicação)."""
         from app.agent.runner.actions import ACTION_SYSTEM
         parts = [ACTION_SYSTEM]
         for i, h in enumerate(history, 1):
             parts.append(f"passo {i} ({h['action']}):\n{h['observation'][:400]}")
         parts.append("Responda com o PRÓXIMO passo (um por vez).")
         fb = "\n\n".join(parts)
-        result = self._run(instruction, project_dir, feedback=fb)
+        self._defer_apply = True
+        try:
+            result = self._run(instruction, project_dir, feedback=fb)
+        finally:
+            self._defer_apply = False
         result.setdefault("action", None)
         return result
 
@@ -144,19 +150,24 @@ class LlamaExecutor(ModelExecutor):
         self.last_raw = resp
         content = self._extract_content(resp)
         files, edits, run_cmd, action = self._parse_files(content)
-        self._apply_files(files, project_dir)
         edit_report = []
-        if edits:
-            from app.agent.apply import PatchApplier
-            ok_edits, edit_report = PatchApplier().apply(project_dir, edits)
-            if not ok_edits:
-                # edit rejeitado: nada foi escrito; devolve como falha
-                return {
-                    "tool_calls": 0, "retries": 0, "tokens": 0,
-                    "files_written": [], "files": {}, "edits_failed": True,
-                    "edit_errors": edit_report, "run": None,
-                    "content_preview": content[:120],
-                }
+        if not self._defer_apply:
+            self._apply_files(files, project_dir)
+            if edits:
+                from app.agent.apply import PatchApplier
+                ok_edits, edit_report = PatchApplier().apply(project_dir,
+                                                             edits)
+                if not ok_edits:
+                    # edit rejeitado: nada foi escrito; devolve como falha
+                    return {
+                        "tool_calls": 0, "retries": 0, "tokens": 0,
+                        "files_written": [], "files": {},
+                        "edits_failed": True,
+                        "edit_errors": edit_report, "run": None,
+                        "content_preview": content[:120],
+                    }
+        else:
+            edit_report = [f"pendente: {len(edits)} edit(s)"]
         if log:
             log.debug(f"RAW_CONTENT ({len(content)}ch): {content[:1500]!r}")
             log.debug(f"FILES_PARSED: {sorted(files.keys())} "
@@ -170,6 +181,7 @@ class LlamaExecutor(ModelExecutor):
                        if isinstance(usage, dict) else 0),
             "files_written": sorted(files.keys()),
             "files": files,
+            "edits": edits,
             "edits_applied": edit_report,
             "run": run_cmd,
             "action": action,

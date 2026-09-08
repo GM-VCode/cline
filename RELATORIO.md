@@ -417,5 +417,22 @@ commit `38a88f7`) para receber esta etapa dentro da regra de ≤200 linhas.
 orçamento estourado, ação inválida, done com/som check, write, plug no
 runner), `validate.py` exit 0.
 
+**Bugs encontrados e corrigidos na prova real (valor do teste de ponta a ponta):**
+1. **Dupla aplicação**: o executor aplicava `files`/`edits` E o ActionLoop
+   aplicava de novo → 2.º edit falhava ("find não existe"). Fix: no modo
+   iterativo (`execute_action`) o executor **só parseia**; quem aplica é o
+   ActionLoop (`_defer_apply`).
+2. **Lista `edits` não chegava ao ActionLoop**: `_run` não devolvia a chave
+   `"edits"` → todo edit era descartado com "sem 'edits' válido". Fix: incluir
+   `"edits"` no retorno.
+3. **Loop infinito em ação inválida**: JSON sem `action` não contava no
+   orçamento → travava até o timeout. Fix: ação inválida **conta** no
+   orçamento + aborta após 3 inválidas seguidas.
+4. Tolerância a edit "achatado" (`file/find/replace` no nível da ação).
+
+**Validação final:** 88 tests OK, `validate.py` exit 0, modelo reiniciado.
+Prova real final: `edit` (aplicado) → `run` self-check (`4`) →
+`finalizado: True, ações: 2`, verificação oficial `CLI_OK`.
+
 **Pendência menor:** expor `--max-actions` na CLI `tools/agent.py`
 (hoje só via API Python).

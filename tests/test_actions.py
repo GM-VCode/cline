@@ -94,6 +94,28 @@ class TestActionLoop(unittest.TestCase):
         self.assertEqual(r["files_written"], ["novo.py"])
         self.assertTrue(os.path.exists(os.path.join(self.dir, "novo.py")))
 
+    def test_edit_achatado_aplica(self):
+        """Modelo manda file/find/replace no nível da ação (bug da prova real)."""
+        ex = StepExec([
+            {"action": "edit", "file": "calc.py",
+             "find": "return a - b", "replace": "return a + b"},
+            {"action": "done"},
+        ])
+        r = ActionLoop(ex, self.checks, self.dir, check_cmd=[]).run("x")
+        self.assertTrue(r["finished"])
+        with open(os.path.join(self.dir, "calc.py"), encoding="utf-8") as fh:
+            self.assertIn("return a + b", fh.read())
+
+    def test_edit_vazio_nao_mentira_ok(self):
+        ex = StepExec([
+            {"action": "edit"},
+            {"action": "done"},
+        ])
+        r = ActionLoop(ex, self.checks, self.dir, check_cmd=[]).run("x")
+        self.assertTrue(r["finished"])
+        self.assertIn("nada foi modificado",
+                      ex.histories[1][0]["observation"])
+
 
 class TestRunnerMaxActions(unittest.TestCase):
     def test_max_actions_ativa_modo_iterativo(self):

@@ -55,6 +55,7 @@ class ActionLoop:
         log = get_agent_logger()
         started = time.time()
         ok, output = False, ""
+        invalid_streak = 0
         response = self.executor.execute_action(prompt, self.project_dir, [])
         while True:
             if response is None:
@@ -62,9 +63,15 @@ class ActionLoop:
                 break
             action = (response.get("action") or "").lower()
             if action not in VALID_ACTIONS:
-                ok = False
+                invalid_streak += 1
+                self.actions_used += 1  # conta no orçamento (anti-loop)
                 output = (f"Ação inválida: {action!r}. "
                           f"Use write|edit|run|done.")
+                if invalid_streak >= 3:
+                    ok = False
+                    if log:
+                        log.debug("ACOES_INVALIDAS_SEGUIDAS: abortando")
+                    break
             elif action == "done":
                 ok, output = True, (response.get("note") or "")[:300]
                 break
@@ -77,6 +84,7 @@ class ActionLoop:
                     log.debug(f"ORCAMENTO_ESTOURADO: {self.actions_used}")
                 break
             else:
+                invalid_streak = 0
                 self.actions_used += 1
                 ok, output = self._do(action, response)
             observation = output if not ok else (
@@ -118,6 +126,15 @@ class ActionLoop:
             return True, f"escrito: {sorted(files.keys())}"
         if action == "edit":
             edits = response.get("edits") or []
+            # tolerância: campos diretos na ação (file/find/replace no topo)
+            if not edits and response.get("find") is not None:
+                edits = [{"file": response.get("file"),
+                          "find": response.get("find"),
+                          "replace": response.get("replace")}]
+            if not isinstance(edits, list) or not edits:
+                return False, ("edit sem 'edits' válido — nada foi "
+                               "modificado. Formato: {\"action\": \"edit\", "
+                               "\"edits\": [{\"file\", \"find\", \"replace\"}]}")
             ok, report = self.applier.apply(self.project_dir, edits)
             return (ok, "; ".join(report) if ok
                     else "EDITS REJEITADOS (nada modificado): "

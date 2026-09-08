@@ -38,6 +38,9 @@ class AgentCLI:
                        help="comando de verificação (string; "
                             "executado via shell no projeto)")
         p.add_argument("--max-attempts", type=int, default=2)
+        p.add_argument("--max-actions", type=int, default=None,
+                       help="ativa modo iterativo (ação→observação, "
+                            "protocolo 11c) com esse orçamento de passos")
         p.add_argument("--temperature", type=float, default=0.2)
         p.add_argument("--no-context", action="store_true",
                        help="não incluir o contexto do projeto no prompt")
@@ -61,11 +64,14 @@ class AgentCLI:
         runner = AgentRunner(executor, check_cmd=check_cmd,
                              max_attempts=self.args.max_attempts,
                              use_context=not self.args.no_context,
-                             identity=identity, store=store)
+                             identity=identity, store=store,
+                             max_actions=self.args.max_actions)
         result = runner.run(self.args.instruction, self.args.project)
         print(f"finalizado: {result['finished']}  "
               f"tentativas: {result['attempts']}  "
-              f"retries: {result['retries']}")
+              f"retries: {result['retries']}"
+              + (f"  ações: {result.get('actions_used')}"
+                 if result.get("actions_used") is not None else ""))
         print(f"arquivos: {result.get('files_written', [])}")
         if result.get("check_output"):
             print(f"verificação: {result['check_output'][:400]}")
