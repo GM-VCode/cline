@@ -317,22 +317,72 @@ tentativa 3 corrigiu de verdade (`from utils import ...`) → verificação OK.
 
 ---
 
-## 10. PRÓXIMA ETAPA — Orquestração: memória das execuções do agente
+## 10. Etapa 10 — Memória das execuções do agente (concluída)
 
-**Objetivo:** cada execução do `AgentRunner` fica registrada no Mongo
-(base `cline_agent`, coleção `agent_runs` + fallback JSON), permitindo
-consultar histórico/evolução fora do benchmark.
+**Implementado:** coleção `agent_runs` no Mongo (`TaskStore.append_agent_run`
+/ `list_agent_runs`, fallback `data/json/agent_runs.json`); `AgentRunner.run()`
+registra cada execução (instrução, finalizado, tentativas, retries, arquivos,
+tempo, erro) — memória nunca quebra o agente; CLI com `--no-memory`;
+consulta via `memory.py agent-runs [N]`; higiene: tests usam
+`AGENT_LOG_PATH` (não poluem `logs/agent.log` real).
 
-**Plano (etapas pequenas, cada uma com teste):**
-1. Higiene: `get_agent_logger()` aceita override via env `AGENT_LOG_PATH`;
-   tests usam path temporário (não poluem `logs/agent.log` real).
-2. `TaskStore`: coleção `agent_runs` (`append_agent_run`/`list_agent_runs`,
-   fallback JSON `data/json/agent_runs.json`) — mesmo padrão de `validations`.
-3. Plug: `AgentRunner.run()` registra o resultado (instrução, finalizado,
-   tentativas, retries, arquivos, tempo) no fim do ciclo; CLI com
-   `--no-memory` para desligar.
-4. Testes: append/list no fallback JSON, execução sem memória, registro
-   após corrida com executor fake.
+**Achado documentado (9.1):** retry com prompt idêntico + temperature baixa
+gerava resposta idêntica (loop infinito, como o caso do Mongo). Corrigido
+com `retry_temperature=0.7` + feedback incluindo o conteúdo realmente
+escrito. O log de debug (`logs/agent.log`) foi o que revelou a causa.
 
-**Critério de conclusão:** suite OK (63+), `validate.py` exit 0, e uma
-execução real do `tools/agent.py` aparecendo em `memory.py agent-runs`.
+**Validação:** 67 tests OK, validate exit 0, execução real registrada e
+visível em `memory.py agent-runs`. Commits `3b0860c`, `16031fd`.
+
+## 11. Etapa 11a — Verificação interna (`run`) — concluída
+
+O modelo agora pode **testar o próprio código antes de declarar pronto**: o
+JSON de resposta aceita `"run": "<comando>"`, que o `AgentRunner` executa no
+projeto **antes** do check oficial. Se o run interno falha, a saída vira
+feedback direto na mesma rodada (sem esperar o check externo).
+
+| Mudança | Onde |
+|---|---|
+| Sistema pede campo opcional `"run"` | `tools/benchmarks/executor_llama.py` |
+| `_parse_files` → retorna `(files, run_cmd)` | idem |
+| `CheckRunner.run_shell(cmd_str, dir)` — comando string via shell | `app/agent/checks.py` |
+| `AgentRunner`: executa run interno, feedback imediato em falha, métrica `internal_runs` no resultado e no `agent_runs` | `app/agent/runner.py` |
+
+**Prova real (Qwythos-9B, modelo reiniciado):**
+```
+RAW_CONTENT: {"files": {"calc.py": "def add(a, b):\n    return a + b\n"},
+              "run": "python test_calc.py", ...}
+RUN interno: 'python test_calc.py'
+finalizado: True  tentativas: 1  retries: 0
+verificação: CHECK_OK
+```
+O modelo corrigiu o bug, **executou o próprio teste** via `run` e só então
+declarou pronto — 1 tentativa, zero retries cegos. (Na 1.ª prova o modelo
+usou `run` 3x seguidas; a falha era do meu comando de check com quoting
+quebrado, não do agente.)
+
+**Validação:** 70 tests OK (67 + 3 novos: run passa, run falho vira feedback,
+run inválido não lança), `validate.py` exit 0.
+
+**Segurança:** `run` executa via shell com timeout do `CheckRunner`; é
+acionado só pelo próprio modelo em projeto local — risco equivalente ao
+check externo já existente.
+
+## 12. PRÓXIMA ETAPA — Etapa 11b: patch cirúrgico (`edits`)
+
+**Objetivo:** parar de reescrever arquivos inteiros (risco de destruir código
+em projetos reais grandes, como o fire drill).
+
+1. `app/agent/apply.py` — class `PatchApplier`: aplica
+   `"edits": [{"file", "find", "replace"}]` sobre arquivos existentes
+   (falha explicitamente se `find` não aparecer exatamente 1x);
+   `"files"` continua aceito (escrita completa).
+2. Sistema do executor documenta os dois formatos.
+3. Tests fake: patch ok, find ambíguo/faltando, arquivo novo via `files`.
+4. Prova real com o modelo (descer/subir antes).
+
+**Critério:** 70+ tests OK, validate 0, prova real editando 1 função de um
+arquivo maior sem tocar no resto.
+
+**Riscos:** o modelo pode errar o `find` (fallback: feedback com o trecho
+real do arquivo devolve a tentativa pro retry).

@@ -121,6 +121,57 @@ class TestAgentRunner(unittest.TestCase):
         r = runner.run("x", self.dir)  # não deve lançar
         self.assertTrue(r["finished"])
 
+    def test_run_interno_do_modelo_passa(self):
+        class ComRun(FakeExecutor):
+            def execute(self, instruction, project_dir):
+                r = self._write(project_dir, False)
+                r["run"] = "python -c \"print('validado')\""
+                return r
+
+        runner = AgentRunner(ComRun(), check_cmd=self.check)
+        r = runner.run("x", self.dir)
+        self.assertTrue(r["finished"])
+        self.assertEqual(r["internal_runs"], 1)
+
+    def test_run_interno_falho_vira_feedback_e_retry(self):
+        class RunRuim(FakeExecutor):
+            def __init__(self):
+                super().__init__(bug_antes=True)
+                self.chamadas = 0
+
+            def _respond(self, project_dir):
+                self.chamadas += 1
+                com_bug = self.chamadas == 1
+                r = self._write(project_dir, com_bug)
+                r["run"] = "python -c \"import calc; assert calc.add(2, 3) == 5\""
+                return r
+
+            def execute(self, instruction, project_dir):
+                return self._respond(project_dir)
+
+            def execute_with_feedback(self, instruction, project_dir, fb):
+                self.feedbacks.append(fb)
+                return self._respond(project_dir)
+
+        ex = RunRuim()
+        runner = AgentRunner(ex, check_cmd=self.check, max_attempts=2)
+        r = runner.run("conserte add", self.dir)
+        self.assertTrue(r["finished"])
+        self.assertEqual(r["internal_runs"], 2)
+        self.assertIn("que você pediu para executar", ex.feedbacks[0])
+
+    def test_run_interno_invalido_nao_lanca(self):
+        class RunLouco(FakeExecutor):
+            def execute(self, instruction, project_dir):
+                r = self._write(project_dir, False)
+                r["run"] = "comando_que_nao_existe_12345"
+                return r
+
+        runner = AgentRunner(RunLouco(), check_cmd=[], max_attempts=1)
+        r = runner.run("x", self.dir)
+        self.assertFalse(r["finished"])
+        self.assertIn("que você pediu para executar", r["error"])
+
 
 class TestCheckRunner(unittest.TestCase):
     def setUp(self):

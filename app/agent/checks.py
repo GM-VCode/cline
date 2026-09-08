@@ -24,6 +24,17 @@ class CheckRunner:
         except (OSError, subprocess.TimeoutExpired, ValueError) as exc:
             return False, f"erro ao executar check: {exc}"
 
+    def run_shell(self, cmd: str, project_dir: str) -> tuple:
+        """Executa comando (string, via shell) — p/ 'run' pedido pelo modelo."""
+        try:
+            proc = subprocess.run(
+                cmd, cwd=project_dir, shell=True,
+                capture_output=True, text=True, timeout=self.timeout)
+            output = (proc.stdout or "") + (proc.stderr or "")
+            return proc.returncode == 0, output.strip()
+        except (OSError, subprocess.TimeoutExpired, ValueError) as exc:
+            return False, f"erro ao executar run: {exc}"
+
     @staticmethod
     def feedback_from(instruction: str, output: str,
                       prev_files: dict = None) -> str:

@@ -55,6 +55,7 @@ class AgentRunner:
         started = time.time()
         attempts, retries = 0, 0
         ok, output, files = False, "", []
+        internal_runs = 0
         log = get_agent_logger()
         for attempt in range(1, self.max_attempts + 1):
             attempts = attempt
@@ -75,6 +76,19 @@ class AgentRunner:
                         "attempts": attempts, "retries": retries,
                         "elapsed_s": round(time.time() - started, 2)}
             files = response.get("files_written", []) if response else []
+            # 11a: o modelo pode pedir para validar o próprio resultado
+            run_cmd = (response or {}).get("run") if response else None
+            if run_cmd:
+                internal_runs += 1
+                if log:
+                    log.debug(f"RUN interno: {run_cmd!r}")
+                run_ok, run_out = self.checks.run_shell(run_cmd, project_dir)
+                if not run_ok:
+                    # falhou o próprio teste do modelo -> feedback direto
+                    ok, output = False, (
+                        f"O comando que você pediu para executar falhou:\n"
+                        f"$ {run_cmd}\n{run_out[:1500]}")
+                    continue
             ok, output = self._check(project_dir)
             if ok:
                 break
@@ -84,6 +98,7 @@ class AgentRunner:
             "error": None if ok else output[:500],
             "attempts": attempts,
             "retries": retries,
+            "internal_runs": internal_runs,
             "files_written": files,
             "check_output": output[:2000],
             "elapsed_s": round(time.time() - started, 2),
@@ -100,6 +115,7 @@ class AgentRunner:
                 "finished": result.get("finished"),
                 "attempts": result.get("attempts"),
                 "retries": result.get("retries"),
+                "internal_runs": result.get("internal_runs", 0),
                 "files": result.get("files_written", []),
                 "elapsed_s": result.get("elapsed_s"),
                 "error": (result.get("error") or "")[:300],

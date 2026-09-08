@@ -15,10 +15,14 @@ from app.agent.debug import get_agent_logger
 DEFAULT_URL = "http://127.0.0.1:8080/v1/chat/completions"
 SYSTEM = (
     "Você é um engenheiro de software cuidadoso. Dada uma tarefa que cria "
-    "código, responda EXCLUSIVAMENTE com um bloco JSON: "
-    "{\"files\": {\"<relative_path>\": \"<contenido do arquivo>\"}, "
-    "\"note\": \"<breve resumen>\"} "
-    "Não escreva nada além do JSON. Cree só os arquivos necessários."
+    "ou corrige código, responda EXCLUSIVAMENTE com um bloco JSON: "
+    "{\"files\": {\"<relative_path>\": \"<conteúdo do arquivo>\"}, "
+    "\"run\": \"<comando opcional para você mesmo validar o resultado>\", "
+    "\"note\": \"<breve resumo>\"} "
+    "Não escreva nada além do JSON. Cree só os arquivos necessários. "
+    "Se incluir \"run\", ele será executado no projeto e a saída te será "
+    "devolvida se falhar — use para testar seu próprio código antes de "
+    "declarar que terminou."
 )
 
 
@@ -76,8 +80,8 @@ class LlamaExecutor(ModelExecutor):
             content = content[end + len("</think>"):] if end != -1 else content
         return content
 
-    def _parse_files(self, content: str) -> dict:
-        """Extrai {\"files\": {...}} do JSON que o modelo devolve."""
+    def _parse_files(self, content: str) -> tuple:
+        """Extrai (files, run_cmd) do JSON que o modelo devolve."""
         content = content.strip()
         # robustez: extraer el sub-bloco JSON de files si viene suelto
         try:
@@ -85,9 +89,12 @@ class LlamaExecutor(ModelExecutor):
             end = content.rfind("}")
             obj = json.loads(content[start:end + 1])
         except (ValueError, json.JSONDecodeError):
-            return {}
+            return {}, None
         files = obj.get("files", {})
-        return files if isinstance(files, dict) else {}
+        run_cmd = obj.get("run")
+        if not isinstance(files, dict):
+            files = {}
+        return files, (run_cmd if isinstance(run_cmd, str) else None)
 
     def _apply_files(self, files: dict, project_dir: str):
         for rel, body in files.items():
@@ -112,11 +119,11 @@ class LlamaExecutor(ModelExecutor):
         resp = self._request(instruction, project_dir, feedback=feedback)
         self.last_raw = resp
         content = self._extract_content(resp)
-        files = self._parse_files(content)
+        files, run_cmd = self._parse_files(content)
         self._apply_files(files, project_dir)
         if log:
             log.debug(f"RAW_CONTENT ({len(content)}ch): {content[:1500]!r}")
-            log.debug(f"FILES_PARSED: {sorted(files.keys())}")
+            log.debug(f"FILES_PARSED: {sorted(files.keys())} RUN: {run_cmd!r}")
 
         usage = resp.get("usage", {})
         return {
@@ -126,5 +133,6 @@ class LlamaExecutor(ModelExecutor):
                        if isinstance(usage, dict) else 0),
             "files_written": sorted(files.keys()),
             "files": files,
+            "run": run_cmd,
             "content_preview": content[:120],
         }
