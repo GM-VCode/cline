@@ -65,10 +65,18 @@ class LocalExecutor(ModelExecutor):
 
 
 def main() -> int:
+    import argparse
+    ap = argparse.ArgumentParser(description="Benchmark do agente")
+    ap.add_argument("--real", action="store_true",
+                    help="usa o modelo real (/v1) em vez do stub local")
+    ap.add_argument("--max-actions", type=int, default=None,
+                    help="ativa o modo iterativo 11c (ex.: 8)")
+    args = ap.parse_args()
     # `--real` mede o modelo de verdade (chama /v1); senão usa LocalExecutor
-    use_real = "--real" in sys.argv[1:]
+    use_real = args.real
     executor = (LlamaExecutor() if use_real else LocalExecutor())
-    runner = BenchmarkRunner(executor, default_catalog())
+    runner = BenchmarkRunner(executor, default_catalog(),
+                             max_actions=args.max_actions)
     results = runner.run_all()
     report = BenchmarkReport(TaskStore())
     summary = report.save(report.summarize(results))

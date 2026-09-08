@@ -35,11 +35,17 @@ class BenchmarkRunner:
     """Roda tarefas do benchmark e coleta métricas por tarefa."""
 
     def __init__(self, executor: ModelExecutor, tasks: list,
-                 work_root: str = None, max_attempts: int = 2):
+                 work_root: str = None, max_attempts: int = 2,
+                 max_actions: int = None):
         self.executor = executor
         self.tasks = tasks
         self.work_root = work_root or tempfile.gettempdir()
         self.max_attempts = max(1, max_attempts)
+        self.max_actions = max_actions  # 11c: None = ciclo clássico
+        self._checks = None
+        if max_actions is not None:
+            from app.agent.checks import CheckRunner
+            self._checks = CheckRunner(timeout=120)
 
     def _fresh_project(self, task_id: str) -> str:
         """Cria um projeto temporário limpo para a tarefa."""
@@ -89,42 +95,72 @@ class BenchmarkRunner:
         retries = 0
         response, error = None, None
         checks = []
-        for attempt in range(1, self.max_attempts + 1):
-            try:
-                if attempt == 1:
-                    response = self.executor.execute(task.instruction,
-                                                     project_dir)
-                    error = None
-                else:
-                    feedback = self._format_feedback(checks)
-                    response = self.executor.execute_with_feedback(
-                        task.instruction, project_dir, feedback)
-                    error = None
-                    retries += 1
-            except Exception as exc:  # pragma: no cover
-                response, error = None, str(exc)
-                break
+        # 11c: modo iterativo — ActionLoop em vez do ciclo clássico
+        if self.max_actions is not None:
+            from app.agent.runner.actions import ActionLoop
+            loop = ActionLoop(self.executor, self._checks, project_dir,
+                              check_cmd=[],  # checks do benchmark são callables
+                              max_actions=self.max_actions)
+            response = loop.run(task.instruction)
             checks = task.run_checks(project_dir)
-            if all(ok for _, ok, _ in checks):
-                break
+        else:
+            for attempt in range(1, self.max_attempts + 1):
+                try:
+                    if attempt == 1:
+                        response = self.executor.execute(task.instruction,
+                                                         project_dir)
+                        error = None
+                    else:
+                        feedback = self._format_feedback(checks)
+                        response = self.executor.execute_with_feedback(
+                            task.instruction, project_dir, feedback)
+                        error = None
+                        retries += 1
+                except Exception as exc:  # pragma: no cover
+                    response, error = None, str(exc)
+                    break
+                checks = task.run_checks(project_dir)
+                if all(ok for _, ok, _ in checks):
+                    break
+            elapsed = round(time.time() - started, 2)
+            passed = sum(1 for _, ok, _ in checks if ok)
+            finished = error is None and passed == len(checks)
+            files_changed = self._count_files(project_dir)
+            return {
+                "task_id": task.task_id,
+                "category": task.category,
+                "finished": finished,
+                "executor_error": error,
+                "checks_total": len(checks),
+                "checks_passed": passed,
+                "checks": [(n, o, m) for n, o, m in checks],
+                "files_created": files_changed,
+                "elapsed_s": elapsed,
+                "tool_calls": (response or {}).get("tool_calls", 0),
+                "retries": retries,
+                "tokens": (response or {}).get("tokens", 0),
+                "project_dir": project_dir,
+            }
+
+        # modo iterativo (11c)
         elapsed = round(time.time() - started, 2)
-
         passed = sum(1 for _, ok, _ in checks if ok)
-        finished = error is None and passed == len(checks)
-
-        files_changed = self._count_files(project_dir)
+        # métrica do benchmark = checks; 'finished' do loop é secundário
+        # (orçamento estourado com checks verdes continua sendo acerto)
+        finished = passed == len(checks)
         return {
             "task_id": task.task_id,
             "category": task.category,
             "finished": finished,
-            "executor_error": error,
+            "executor_error": ("" if finished
+                               else (response.get("error") or "")),
             "checks_total": len(checks),
             "checks_passed": passed,
             "checks": [(n, o, m) for n, o, m in checks],
-            "files_created": files_changed,
+            "files_created": self._count_files(project_dir),
             "elapsed_s": elapsed,
-            "tool_calls": (response or {}).get("tool_calls", 0),
-            "retries": retries,
+            "tool_calls": response.get("actions_used", 0),
+            "retries": 0,
             "tokens": (response or {}).get("tokens", 0),
             "project_dir": project_dir,
         }

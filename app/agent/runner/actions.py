@@ -62,6 +62,16 @@ class ActionLoop:
                 ok, output = False, "executor não retornou resposta"
                 break
             action = (response.get("action") or "").lower()
+            if not action:
+                # inferência: o modelo respondeu JSON sem 'action'
+                if response.get("files"):
+                    action = "write"
+                elif response.get("edits"):
+                    action = "edit"
+                elif response.get("cmd") or response.get("run"):
+                    action = "run"
+                else:
+                    action = "done"  # nota sem campo = considerar pronto
             if action not in VALID_ACTIONS:
                 invalid_streak += 1
                 self.actions_used += 1  # conta no orçamento (anti-loop)
