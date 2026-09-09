@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 from urllib.request import Request, urlopen
 
 from app.agent.debug import get_agent_logger
+from app.services.proxy.loopguard import LoopGuard
 from app.services.proxy.recorder import ProxyRecorder
 from app.services.proxy.runstate import StreamProbe
 from app.services.proxy.sessions import SessionRegistry
@@ -26,9 +27,45 @@ class ProxyHandler(BaseHTTPRequestHandler):
     store: "TaskStore | None" = None  # injetado por ProxyServer
     upstream: str = "http://127.0.0.1:8080"
     sessions: SessionRegistry | None = None
+    loopguard: LoopGuard | None = None  # injetado por ProxyServer
     SKIP_HEADERS = ("host", "content-length", "connection",
                     "accept-encoding", "transfer-encoding")
     UPSTREAM_TIMEOUT = 600  # geração longa não pode estourar cedo
+
+    # ---------- anti-loop ----------
+    def _apply_loopguard(self, body: dict, raw: bytes) -> bytes:
+        """Detecta request idêntica consecutiva e intervém (fail-open).
+
+        Na 2ª repetição injeta um aviso nas mensagens e sobe a temperature
+        para quebrar o determinismo; na 3ª+ o aviso é mais forte. Retorna
+        o raw re-serializado ou o original se nada mudar.
+        """
+        guard = self.loopguard
+        if guard is None:
+            return raw
+        try:
+            sid = SessionRegistry.session_id(body)
+            rhash = guard.request_hash(body)
+            aviso, temp = guard.register(sid, rhash)
+            if aviso is None and temp is None:
+                return raw
+            messages = body.get("messages") or []
+            # Qwen/chat template não aceita system no meio: injeta como user
+            messages.append({"role": "user", "content": aviso})
+            body["messages"] = messages
+            if temp is not None and "temperature" not in body:
+                body["temperature"] = temp
+            log = get_agent_logger()
+            if log:
+                log.warn(f"proxy: LOOPGUARD sid={sid[:24]} "
+                         f"repeats={guard.repeats_for(sid)} "
+                         f"temp={body.get('temperature')}")
+            return json.dumps(body, ensure_ascii=False).encode("utf-8")
+        except Exception as exc:  # fail-open: nunca bloquear o fluxo
+            log = get_agent_logger()
+            if log:
+                log.warn(f"proxy: loopguard ignorado ({exc})")
+            return raw
 
     # ---------- infra ----------
     def log_message(self, format: str, *args) -> None:  # assinatura stdlib
@@ -110,6 +147,9 @@ class ProxyHandler(BaseHTTPRequestHandler):
                 log = get_agent_logger()
                 if log:
                     log.warn(f"proxy: falha ao registrar memória: {exc}")
+        # anti-loop: request idêntica consecutiva → aviso + temp bump
+        if body:
+            raw = self._apply_loopguard(body, raw)
         probe = StreamProbe()
         try:
             self._relay_upstream(raw, probe=probe)

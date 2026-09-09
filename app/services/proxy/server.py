@@ -9,6 +9,7 @@ from http.server import ThreadingHTTPServer
 from typing import TYPE_CHECKING
 
 from app.services.proxy.handler import ProxyHandler
+from app.services.proxy.loopguard import LoopGuard
 from app.services.proxy.sessions import SessionRegistry
 
 if TYPE_CHECKING:  # anotação só para o editor (não roda em runtime)
@@ -26,12 +27,14 @@ class ProxyServer:
         self.upstream = upstream
         self.store = store
         self.sessions = SessionRegistry()
+        self.loopguard = LoopGuard()
         self._httpd: ThreadingHTTPServer | None = None
 
     def _configure_handler(self) -> None:
         ProxyHandler.upstream = self.upstream
         ProxyHandler.store = self.store
         ProxyHandler.sessions = self.sessions
+        ProxyHandler.loopguard = self.loopguard
 
     def run(self, blocking: bool = True):
         """Sobe o servidor. blocking=False devolve a thread (p/ testes)."""

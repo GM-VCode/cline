@@ -97,12 +97,62 @@ request → hash das mensagens (por sessão)
 | Etapa | Status | Tentativa | Evidência |
 |---|---|---|---|
 | 0 auditoria | ✅ concluída | 1/1 | OS/shell/python/git/portas confirmados |
-| 1 loopguard.tests | ⏳ pendente | — | — |
-| 2 loopguard.core | ⏳ pendente | — | — |
-| 3 handler.integrate | ⏳ pendente | — | — |
-| 4 suite.gate | ⏳ pendente | — | — |
-| 5 live.validate | ⏳ pendente | — | — |
-| 6 docs.commit | ⏳ pendente | — | — |
+| 1 loopguard.tests | ✅ concluída | 1/1 | `tests/test_loopguard.py` criado (10 testes); vermelho confirmado (`ModuleNotFoundError`) |
+| 2 loopguard.core | ✅ concluída | 1/1 | `loopguard.py` (99 linhas); 10/10 testes OK |
+| 3 handler.integrate | ✅ concluída | 2/3 | Patch no `do_POST` + `_apply_loopguard`; correção: `session_id()` estático (evita duplicar count) |
+| 4 suite.gate | ✅ concluída | 2/2 | pyright 0 erros (após fix de narrowing nos testes); **139 testes OK**; validate EXIT 0; diff OK |
+| 5 live.validate | ✅ concluída | 2/2 | Ver detalhes abaixo |
+| 6 docs.commit | ⏳ em andamento | — | — |
+
+## Resultado da validação ao vivo (Etapa 5)
+
+**Tentativa 1 — bug real encontrado pelo teste ao vivo:** requests idênticas 2
+e 3 retornaram **500**. Causa: aviso injetado como `role: "system"` no meio
+das mensagens — o template de chat do Qwen só aceita system na posição 0.
+**Correção:** injetar como `role: "user"` (`handler.py:54`). Reinício + reteste.
+
+**Tentativa 2 — tudo verde:**
+
+```
+req 1: 200  req 2: 200  req 3: 200   (3 requests idênticas)
+
+logs/agent.log:
+  WARN proxy: LOOPGUARD sid=u-digiteexatamenteOK repeats=2 temp=0.7
+  WARN proxy: LOOPGUARD sid=u-digiteexatamenteOK repeats=3 temp=0.9
+
+resposta do modelo na request pós-nudge (prova de que o aviso chega):
+  "Entendido. A instrução era para digitar exatamente \"OK\"."
+
+check_runs.py (Mongo):
+  1 doc/conversa, task_id=u-digiteexatamenteOK,
+  requests_count=6, timeline correta, agent_runs->mongo
+```
+
+**Comportamento confirmado:** 1ª passa silenciosa → 2ª nudge + temp 0.7 →
+3ª+ aviso forte + temp 0.9 → Mongo segue gravando 1 doc por conversa.
+
+### Ajustes de rota registrados durante a execução
+- `SessionRegistry.session_id()` (estático) em vez de `touch()` — tocar de
+  novo duplicaria o contador da sessão (o recorder já toca).
+- Aviso como mensagem `user`, não `system` (limitação do template Qwen).
+- Testes corrigidos p/ narrowing do pyright (`assert x is not None`).
+
+## STATUS FINAL DA FASE 2
+
+```
+STATUS: CONCLUÍDO
+IMPLEMENTADO: LoopGuard (detecção por hash + intervenção progressiva)
+              integrado ao ProxyHandler, fail-open, thread-safe.
+VERIFICADO:   139 testes OK | pyright 0 erros | validate EXIT 0 |
+              live: 3× 200, LOOPGUARD disparou 2×, Mongo íntegro.
+ARQUIVOS:     app/services/proxy/loopguard.py (novo),
+              app/services/proxy/handler.py, app/services/proxy/server.py,
+              tests/test_loopguard.py (novo), docs/RELATORIO-v2.md.
+PENDÊNCIAS:   (1) print cosmético agent_runs em tools/agent.py:111;
+              (2) gate de sintaxe ast.parse ainda não recolocado;
+              (3) expiração de sessões antigas no LoopGuard (memória
+              cresce devagar; limiar baixo em uso real).
+```
 
 **Regras do ciclo (do prompt operacional):** máx. 3 tentativas/etapa; 2
 repetições da mesma ação abrem circuit breaker; exit 0 não é prova — efeito
