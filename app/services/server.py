@@ -99,6 +99,12 @@ class LlamaServer:
         # RACIOCÍNIO (<think>): -rea on|off|auto. Default "off" p/ o Cline
         # (thinking ligado truncava tool calls longos e degradava a saída)
         args += ["-rea", str(c.REASONING).lower()]
+        # Reasoning preserve: o template Qwen preserva reasoning por
+        # default no boot; com REASONING=off isso deixa o modelo
+        # "pensar" (texto/plano) em vez de emitir tool calls. Corta
+        # a preservacao com --no-reasoning-preserve (si habilitado).
+        if str(c.REASONING).lower() == "off" and not c.REASONING_PRESERVE:
+            args += ["--no-reasoning-preserve"]
         # FLASH ATTENTION: reduz a VRAM do KV cache (crítico p/ 16 GB)
         if c.FLASH_ATTN in ("on", "off", "auto"):
             args += ["-fa", c.FLASH_ATTN]
