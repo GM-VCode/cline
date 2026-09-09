@@ -102,7 +102,7 @@ request → hash das mensagens (por sessão)
 | 3 handler.integrate | ✅ concluída | 2/3 | Patch no `do_POST` + `_apply_loopguard`; correção: `session_id()` estático (evita duplicar count) |
 | 4 suite.gate | ✅ concluída | 2/2 | pyright 0 erros (após fix de narrowing nos testes); **139 testes OK**; validate EXIT 0; diff OK |
 | 5 live.validate | ✅ concluída | 2/2 | Ver detalhes abaixo |
-| 6 docs.commit | ⏳ em andamento | — | — |
+| 6 docs.commit | ✅ concluída | 1/1 | Commit `6d33c9a`; este relatório atualizado com execução real |
 
 ## Resultado da validação ao vivo (Etapa 5)
 
@@ -157,3 +157,77 @@ PENDÊNCIAS:   (1) print cosmético agent_runs em tools/agent.py:111;
 **Regras do ciclo (do prompt operacional):** máx. 3 tentativas/etapa; 2
 repetições da mesma ação abrem circuit breaker; exit 0 não é prova — efeito
 real observado é; `BLOQUEADO: <motivo>` quando não houver progresso.
+
+---
+
+# Fase 2.5 — Saúde do modelo + benchmark consolidado (2026-09-08 21:11–21:20)
+
+## Bateria executada
+
+1. **Doctor** (`tools/doctor.py`) → **SAUDÁVEL** (0 falhas, 1 aviso menor:
+   "memória vazia" no state atual).
+2. **Benchmark real** (`tools/benchmarks/run.py --real`) → **3 baterias**,
+   todas persistidas no Mongo (`benchmark_runs`; 29 corridas no histórico).
+3. **Suíte completa** (15 arquivos em `tests/`) → **139 testes OK** (16.1s).
+
+## Conformidade com o card oficial (HuggingFace)
+
+| Item | Card oficial | Nossa config | Status |
+|---|---|---|---|
+| CTX | modelo 1M | 100352 | ✅ |
+| Visão | text-only fine-tune | MM_PROJ_ENABLED=0 | ✅ |
+| Sampling | **temp 0.6, top_p 0.95, top_k 20, rep 1.05** | temp **0.3**, top_k 40, top_p 0.9 | ⚠️ fora |
+| max_tokens | **16.384 recomendado** | 2048 (executor) | ⚠️ fora |
+| Loops | "T≤0.3 pode entrar em repetition loops" | LoopGuard compensa no proxy | 🟡 paliativo |
+
+## Benchmark — 3 baterias
+
+| Bateria | Placar | Tempo médio | Retries |
+|---|---|---|---|
+| 1 (21:12) | 9/10 (90%) | 7.45s | 0.1 |
+| 2 (21:18) | 9/10 (90%) | 7.58s | 0.0 |
+| 3 (21:20) | 8/10 (80%) | 4.98s | 0.2 |
+| **TOTAL** | **26/30 — 86.7%** | **6.67s** | **0.1** |
+
+| Tarefa | Runs | Checks | Veredito |
+|---|---|---|---|
+| 001 criar_funcao | 3/3 | 9/9 | 💯 |
+| 002 editar_funcao | 3/3 | 3/3 | 💯 |
+| 003 bug_simples | 3/3 | 6/6 | 💯 |
+| 004 bug_multi_arquivo | 3/3 | 6/6 | 💯 |
+| **005 feature_com_testes** | **0/3** | **3/9** | 🔴 falha sistemática |
+| 006 refactor_sem_quebrar | 3/3 | 6/6 | 💯 |
+| 007 interpretar_erro | 3/3 | 3/3 | 💯 |
+| 008 projeto_desconhecido | 2/3 | 2/2 | 🟡 intermitente |
+| 009 codigo_e_docs | 3/3 | 6/6 | 💯 |
+| 010 consertar_incompleto | 3/3 | 3/3 | 💯 |
+
+## Diagnóstico da 005 (evidência nos RAW_CONTENT de logs/bench-*.log)
+
+O modelo **gera o código correto** (slugify + testes) mas o JSON sai
+malformado em ~2 de 3 respostas:
+
+- trailing comma → `json.loads` rejeita;
+- aspa de fechamento esquecida no meio do conteúdo.
+
+Resultado: `FILES_PARSED: []` → nada vai ao disco → os checks de teste
+falham. **É defeito do parser, não do modelo.** A 008 falhou pelo mesmo
+mecanismo, de forma intermitente.
+
+## Correções apontadas (pendências 4 e 5)
+
+1. **Reparo de JSON no `_parse_files`** (executor + agente): tolerar
+   trailing commas e fechar string/objeto truncado antes de desistir.
+   → converte a 005 em ponto cheio com conteúdo que o modelo já produz.
+2. **max_tokens 2048 → 16384** no `LlamaExecutor` (recomendação explícita
+   do card) → evita truncamento no meio do JSON em tarefas multi-arquivo.
+3. (Já aprovado, aguardando restart) sampling p/ card: temp 0.6,
+   top_p 0.95, top_k 20 — ataca a causa dos repetition loops na fonte.
+
+## STATUS FASE 2.5
+
+```
+STATUS: CONCLUÍDO (medição) — correções listadas pendentes de aprovação
+VERIFICADO: doctor SAUDÁVEL | 3 baterias no Mongo | 139 testes OK
+PRÓXIMA AÇÃO: implementar reparo de JSON + max_tokens 16384 (com testes)
+```
