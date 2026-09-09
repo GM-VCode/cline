@@ -146,15 +146,41 @@ class LlamaServer:
         return False
 
     # ---------- exibição ----------
+    @staticmethod
+    # ---------- exibição ----------
+    @staticmethod
+    def _es_valor(token: str) -> bool:
+        """True si o token é valor de uma flag (incl. numéricos -1)."""
+        if not token.startswith("-"):
+            return True
+        resto = token[1:].replace(".", "").replace(",", "").lstrip("-")
+        return resto.isdigit()
+
+    @staticmethod
+    def _pair_args(args: list[str]) -> list[tuple[str, str | None]]:
+        """Agrupa args em (flag, valor). Flags booleanos levam None."""
+        pairs: list[tuple[str, str | None]] = []
+        i = 0
+        while i < len(args):
+            if (i + 1 < len(args)
+                    and LlamaServer._es_valor(args[i + 1])):
+                pairs.append((args[i], args[i + 1]))
+                i += 2
+            else:
+                pairs.append((args[i], None))
+                i += 1
+        return pairs
     def show_config(self, args: list[str]) -> None:
         print("=" * 60)
         print("  Qwythos-9B — config efetiva")
         print("=" * 60)
-        for i in range(0, len(args), 2):
-            print(f"  {args[i]:<16} {args[i + 1]}")
+        for flag, valor in self._pair_args(args):
+            if valor is None:
+                print(f"  {flag}")
+            else:
+                print(f"  {flag:<16} {valor}")
         print("=" * 60)
 
-    # ---------- execução ----------
     def run(self) -> None:
         c = self.cfg
         self.validate()
