@@ -19,10 +19,11 @@ if TYPE_CHECKING:  # só p/ anotações (evita import circular em runtime)
 
 
 class TaskStoreProtocol(Protocol):
-    """Interface mínima de memória que o AgentRunner utiliza."""
+    """Interface mínima de memória que o AgentRunner utiliza.
 
-    def append_agent_run(self, entry: dict,
-                         task_id: str | None = None) -> dict: ...
+    Apenas save_state: agent_runs é gerenciado SOMENTE pelo proxy
+    (ProxyRecorder) — o runner grava apenas o estado da tarefa.
+    """
 
     def save_state(self, payload: dict,
                    task_id: str | None = None) -> dict: ...
