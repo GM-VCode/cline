@@ -26,14 +26,14 @@ ProjectPath.ensure()
 ROOT = ProjectPath.ROOT
 
 
-def _run(cmd: list) -> "tuple[int, str]":
+def _run(cmd: list[str]) -> tuple[int, str]:
     """Ejecuta un comando y devuelve (código, salida)."""
     proc = subprocess.run(cmd, capture_output=True, text=True)
     out = (proc.stdout or "") + (proc.stderr or "")
     return proc.returncode, out.strip()
 
 
-def step(nome: str, cmd: list, on_fail: str) -> bool:
+def step(nome: str, cmd: list[str], on_fail: str) -> bool:
     print(f"==> {nome}")
     code, out = _run(cmd)
     if out:

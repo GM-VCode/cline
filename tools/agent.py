@@ -11,6 +11,7 @@
 import argparse
 import os
 import sys
+from typing import TYPE_CHECKING
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -21,15 +22,19 @@ from app.agent import AgentIdentity, AgentRunner  # noqa: E402
 from app.agent.debug import get_agent_logger  # noqa: E402
 from tools.benchmarks.executor_llama import LlamaExecutor  # noqa: E402
 
+if TYPE_CHECKING:
+    from app.services.task_store import TaskStore
+    from tools.logger import AppLogger
+
 
 class AgentCLI:
     """Ponto de entrada do agente pela linha de comando."""
 
-    def __init__(self, argv: list | None = None):
+    def __init__(self, argv: list[str] | None = None) -> None:
         self.args = self._parse(argv)
 
     @staticmethod
-    def _parse(argv):
+    def _parse(argv: list[str] | None) -> argparse.Namespace:
         p = argparse.ArgumentParser(
             description="Agente: modelo local + verificação real")
         p.add_argument("--project", required=True,
@@ -55,13 +60,17 @@ class AgentCLI:
         return p.parse_args(argv)
 
     @staticmethod
-    def _say(msg: str, log) -> None:
+    def _say(msg: str, log: "AppLogger | None") -> None:
         """Mostra no console e registra em logs/agent.log."""
         print(msg)
         if log:
             log.info(msg)
 
-    def _memory_report(self, store, log) -> None:
+    def _memory_report(
+        self,
+        store: "TaskStore | None",
+        log: "AppLogger | None",
+    ) -> None:
         """Diagnóstico de memória: Mongo ativo, fallback JSON ou off."""
         if store is None:
             motivo = ("--no-memory" if self.args.no_memory
@@ -75,7 +84,9 @@ class AgentCLI:
                       f"({store.error})", log)
 
     def run(self) -> int:
-        check_cmd = self.args.check.split() if (self.args.check or "").strip() else []
+        check_value: object = getattr(self.args, "check", "")
+        check_text = check_value if isinstance(check_value, str) else ""
+        check_cmd: list[str] = check_text.split() if check_text.strip() else []
         if not check_cmd:
             print("ERRO: --check é obrigatório (comando de verificação).",
                   file=sys.stderr)

@@ -6,8 +6,6 @@
 
 import os
 
-from project_path import Config as _Config
-
 DEFAULT_URI = "mongodb://localhost:27017/"
 DEFAULT_DB = "cline_agent"
 
@@ -38,8 +36,22 @@ class RuntimePaths:
     @staticmethod
     def _load_env() -> dict[str, str]:
         try:
-            return _Config._load_dotenv(
-                os.path.join(RuntimePaths._project_root(), ".env"))
+            values: dict[str, str] = {}
+            with open(
+                os.path.join(RuntimePaths._project_root(), ".env"),
+                encoding="utf-8",
+            ) as env_file:
+                for line in env_file:
+                    line = line.strip()
+                    if not line or line.startswith("#") or "=" not in line:
+                        continue
+                    key, value = line.split("=", 1)
+                    key = key.strip()
+                    value = value.strip()
+                    if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
+                        value = value[1:-1]
+                    values[key] = value
+            return values
         except Exception:
             return {}
 

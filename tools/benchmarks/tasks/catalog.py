@@ -10,7 +10,7 @@ from tools.benchmarks.tasks.core import BenchmarkTask
 from tools.benchmarks.tasks.task_005x import feature_com_testes_longa
 
 
-def default_catalog() -> list:
+def default_catalog() -> list[BenchmarkTask]:
     """Catálogo padrão de 11 tarefas padronizadas do benchmark."""
     return [
         BenchmarkTask(

@@ -12,6 +12,7 @@ import os
 import sys
 import urllib.request
 import urllib.error
+from typing import Any, cast
 
 # Emojis nos prints: garante stdout UTF-8 mesmo em consoles
 # Windows cp1252 e pipes (recuperação de falha de shell).
@@ -48,7 +49,7 @@ class ModelDoctor:
 
     def check_paths(self) -> tuple[str, str]:
         c = self.cfg
-        msgs = []
+        msgs: list[str] = []
         if not os.path.isfile(c.LLAMA_SERVER):
             msgs.append(f"llama-server.exe ausente: {c.LLAMA_SERVER}")
         if not os.path.isfile(c.MODEL_PATH):
@@ -62,7 +63,7 @@ class ModelDoctor:
 
     def check_config(self) -> tuple[str, str]:
         c = self.cfg
-        probs = []
+        probs: list[str] = []
         if c.CTX % 256 != 0:
             probs.append(f"CTX={c.CTX} não é múltiplo de 256")
         if str(c.LOG_LEVEL).upper() not in ("DEBUG", "INFO", "WARN", "ERROR", "CRITICAL"):
@@ -90,7 +91,11 @@ class ModelDoctor:
         if state_path and os.path.isfile(state_path):
             data = JsonFile.read(state_path)
             if isinstance(data, dict):
-                return ("ok", f"estado legível (atualizado {data.get('updated_at', '?')})")
+                state: dict[str, Any] = cast(dict[str, Any], data)
+                return (
+                    "ok",
+                    f"estado legível (atualizado {state.get('updated_at', '?')})",
+                )
             return ("fail", f"JSON de estado corrompido: {state_path}")
         return ("ok", "sem estado em disco ainda (normal em repo novo)")
     def check_mongo(self) -> tuple[str, str]:

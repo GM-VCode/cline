@@ -8,7 +8,7 @@
 import json
 import urllib.error
 from http.server import BaseHTTPRequestHandler
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 from urllib.request import Request, urlopen
 
 from app.agent.debug import get_agent_logger
@@ -33,7 +33,7 @@ class ProxyHandler(BaseHTTPRequestHandler):
     UPSTREAM_TIMEOUT = 600  # geração longa não pode estourar cedo
 
     # ---------- anti-loop ----------
-    def _apply_loopguard(self, body: dict, raw: bytes) -> bytes:
+    def _apply_loopguard(self, body: dict[str, Any], raw: bytes) -> bytes:
         """Detecta request idêntica consecutiva e intervém (fail-open).
 
         Na 2ª repetição injeta um aviso nas mensagens e sobe a temperature
@@ -49,7 +49,12 @@ class ProxyHandler(BaseHTTPRequestHandler):
             aviso, temp = guard.register(sid, rhash)
             if aviso is None and temp is None:
                 return raw
-            messages = body.get("messages") or []
+            messages_value = body.get("messages")
+            messages: list[Any] = (
+                cast(list[Any], messages_value)
+                if isinstance(messages_value, list)
+                else []
+            )
             # Qwen/chat template não aceita system no meio: injeta como user
             messages.append({"role": "user", "content": aviso})
             body["messages"] = messages
@@ -68,12 +73,12 @@ class ProxyHandler(BaseHTTPRequestHandler):
             return raw
 
     # ---------- infra ----------
-    def log_message(self, format: str, *args) -> None:  # assinatura stdlib
+    def log_message(self, format: str, *args: Any) -> None:
         log = get_agent_logger()
         if log:
             log.debug("proxy: " + (format % args))
 
-    def _send_json(self, code: int, obj: dict):
+    def _send_json(self, code: int, obj: dict[str, Any]) -> None:
         data = json.dumps(obj, ensure_ascii=False).encode("utf-8")
         self.send_response(code)
         self.send_header("Content-Type", "application/json; charset=utf-8")
@@ -122,7 +127,7 @@ class ProxyHandler(BaseHTTPRequestHandler):
             resp.close()
 
     # ---------- verbos ----------
-    def do_GET(self):
+    def do_GET(self) -> None:
         try:
             self._relay_upstream()
         except Exception as exc:
@@ -131,11 +136,12 @@ class ProxyHandler(BaseHTTPRequestHandler):
                 log.warn(f"proxy: falha GET {self.path}: {exc}")
             self._send_json(502, {"error": f"upstream: {exc}"})
 
-    def do_POST(self):
+    def do_POST(self) -> None:
         length = int(self.headers.get("Content-Length") or 0)
         raw = self.rfile.read(length) if length else b""
         try:
-            body = json.loads(raw) if raw else {}
+            parsed: Any = json.loads(raw) if raw else {}
+            body = cast(dict[str, Any], parsed) if isinstance(parsed, dict) else {}
         except ValueError:
             body = {}
         recorder = ProxyRecorder(self.store, self.sessions)

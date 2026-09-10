@@ -25,7 +25,7 @@
 
 ## ⚡ Como usar (3 passos)
 
-1. 🖱️ **Duplo clique no atalho `INICIAR-Qwythos-9B`** (na raiz do projeto)
+1. 🖱️ **Duplo clique no atalho `INICIAR-LunarIA`** (raiz) ou `LunarIA-Stack-Completa` (Área de Trabalho)
 2. ⏳ Espere aparecer:
    ```
    PRONTO: http://127.0.0.1:8080/v1  (Model ID: LunarIA)
@@ -52,8 +52,8 @@ Cline (VS Code) → proxy (:8081) → llama-server (:8080)
 
 | Porta | Processo | Como sobe |
 |---|---|---|
-| `:8080` | **llama-server** (o modelo) | Atalho `INICIAR-Qwythos-9B` — **deixe a janela aberta** (fechar/`Ctrl+C` = o modelo cai) |
-| `:8081` | **proxy de memória** | cmd próprio: `python tools\proxy.py` (fica rodando; `Ctrl+C` para parar) |
+| `:8080` | **llama-server** (o modelo) | Sobe junto com a stack completa (`INICIAR-LunarIA.bat` / atalho da Área de Trabalho) — roda sem janela, log em `logs\llama-server.out.log` |
+| `:8081` | **proxy de memória** | Sobe automaticamente com a stack completa (ou sozinho: `python tools\proxy.py`) |
 
 > ⚠️ O bat **não** sobe o proxy — são duas janelas: a do bat (modelo) e a do cmd (proxy).
 
@@ -152,9 +152,9 @@ LunarIA/
 │   └── .gitkeep                  ← mantém a carpeta rastreada
 │
 ├── 🖥️ bat/                       ← scripts de inicialização (ver bat/README.md)
-│   ├── INICIAR-Qwythos-9B.bat          → inicia com janela de logs
-│   ├── INICIAR-Qwythos-9B-oculto.bat   → inicia em janela oculta
-│   ├── INICIAR-Qwythos-9B-oculto.ps1   → health check automático
+│   ├── INICIAR-STACK-COMPLETA.bat     → ⭐ sobe modelo + proxy (1 clique)
+│   ├── INICIAR-STACK-COMPLETA.ps1     → lógica do bat acima
+│   ├── PARAR-STACK.bat                → derruba tudo
 │   └── README.md
 │
 ├── 🧠 models/                    ← modelos .gguf (ver models/README.md)
@@ -165,7 +165,7 @@ LunarIA/
 │   ├── Qwythos-9B-...-mmproj-BF16.gguf → projector multimodal (~921 MB)
 │   └── README.md
 │
-├── 🔗 INICIAR-Qwythos-9B.lnk     ← ATALHO na raiz (duplo clique aqui!)
+├── 🔗 LunarIA-Stack-Completa.lnk  ← ATALHO (Área de Trabalho) — duplo clique aqui!
 ├── ⚙️ .env                       ← ★ ONDE VOCÊ CONFIGURA TUDO
 ├── 📋 requirements.txt           ← dependências (só stdlib!)
 ├── 🧪 validate.py                ← GATE de validação obrigatório (tests + sintaxis + diff)

@@ -7,7 +7,7 @@
 # ============================================================
 
 import time
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from app.agent.debug import get_agent_logger
 from app.services.proxy import runstate
@@ -15,20 +15,20 @@ from app.services.proxy.sessions import SessionRegistry
 
 if TYPE_CHECKING:  # anotação só para o editor (sem import circular)
     from app.task_store import TaskStore
-    from app.services.proxy.sessions import SessionRegistry as _Sess
 
 
 class ProxyRecorder:
     """Memória da conversa: 1 documento por task_id + timeline."""
 
     def __init__(self, store: "TaskStore | None",
-                 sessions, clock=None) -> None:
+                 sessions: SessionRegistry | None,
+                 clock: Any = None) -> None:
         self.store = store
         self.sessions = sessions
         self._clock = clock or time.time
 
     # ---------- request do usuário ----------
-    def record_request(self, body: dict) -> None:
+    def record_request(self, body: dict[str, Any]) -> None:
         """Request do usuário: reabre/toca a conversa (nunca duplica)."""
         if self.store is None or self.sessions is None:
             return
@@ -43,7 +43,7 @@ class ProxyRecorder:
         self._save(doc, instr, now)
 
     # ---------- resposta do modelo ----------
-    def record_response(self, body: dict, finish_reason: str,
+    def record_response(self, body: dict[str, Any], finish_reason: str,
                         has_tool_calls: bool) -> None:
         """Resposta do modelo: aplica a transição de estado (tool/stop)."""
         if self.store is None:
@@ -58,7 +58,7 @@ class ProxyRecorder:
         self._save(doc, doc.get("instruction", ""), now)
 
     # ---------- interno ----------
-    def _save(self, doc: dict, objective: str, now: float) -> None:
+    def _save(self, doc: dict[str, Any], objective: str, now: float) -> None:
         if self.store is None:
             return
         tid = doc["task_id"]

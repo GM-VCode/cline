@@ -13,6 +13,7 @@
 
 import os
 import sys
+from typing import Any
 
 # Força UTF-8 no stdout para evitar UnicodeEncodeError (cp1252 no Windows CMD)
 _reconfigure = getattr(sys.stdout, "reconfigure", None)
@@ -32,6 +33,13 @@ from tools.benchmarks.tasks import default_catalog  # noqa: E402
 from tools.benchmarks.report import BenchmarkReport  # noqa: E402
 from tools.benchmarks.executor_llama import LlamaExecutor  # noqa: E402
 from data.mongodb.store import TaskStore  # noqa: E402
+from project_path import Config  # noqa: E402
+
+
+def model_key() -> str:
+    """Nome único do modelo atual (do gguf): ex. 'Q8_0'."""
+    arquivo = os.path.splitext(os.path.basename(Config().MODEL_PATH))[0]
+    return arquivo.split("-")[-1].strip() or "unknown"
 
 
 class LocalExecutor(ModelExecutor):
@@ -39,7 +47,12 @@ class LocalExecutor(ModelExecutor):
     esperados (mesmo comportamento do FakeExecutor dos testes).
     Serve para validar o pipeline de ponta a ponta sem o modelo."""
 
-    def execute(self, instruction, project_dir):
+    def execute(
+        self,
+        instruction: str,
+        project_dir: str,
+    ) -> dict[str, Any]:
+        _ = instruction
         task_id = os.path.basename(project_dir).replace("bench_", "")
         for task in default_catalog():
             if task.task_id == task_id:
@@ -72,22 +85,25 @@ def main() -> int:
                     help="usa o modelo real (/v1) em vez do stub local")
     ap.add_argument("--max-actions", type=int, default=None,
                     help="ativa o modo iterativo 11c (ex.: 8)")
+    ap.add_argument("--attempts", type=int, default=2,
+                    help="tentativas por tarefa com feedback dos checks")
     args = ap.parse_args()
     # `--real` mede o modelo de verdade (chama /v1); senão usa LocalExecutor
     use_real = args.real
     executor = (LlamaExecutor() if use_real else LocalExecutor())
     runner = BenchmarkRunner(executor, default_catalog(),
+                             max_attempts=args.attempts,
                              max_actions=args.max_actions)
     results = runner.run_all()
-    report = BenchmarkReport(TaskStore())
+    store = TaskStore(model_name=model_key())
+    report = BenchmarkReport(store)
     summary = report.save(report.summarize(results))
     report.print_summary(summary)
-    # Confirmar persistência
-    store = TaskStore()
+    # Confirmar persistência (na coleção do modelo atual)
     saved = store.list_benchmarks(limit=1)
     store.close()
     n = len(saved) if saved else 0
-    print(f"  persistido: {n} corrida(s) em benchmark_runs")
+    print(f"  persistido: {n} corrida(s) em benchmark_runs_{model_key()}")
     return 0
 
 

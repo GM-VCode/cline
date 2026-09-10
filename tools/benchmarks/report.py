@@ -6,6 +6,7 @@
 
 import sys
 import time
+from typing import Any
 
 # Força UTF-8 no stdout para evitar UnicodeEncodeError (cp1252 no Windows CMD)
 _reconfigure = getattr(sys.stdout, "reconfigure", None)
@@ -15,28 +16,31 @@ if callable(_reconfigure) and sys.stdout.encoding != "utf-8":
     except Exception:  # pragma: no cover
         pass
 
+BenchmarkResult = dict[str, Any]
+BenchmarkSummary = dict[str, Any]
+
 
 class BenchmarkReport:
     """Resume resultados e persiste corridas do benchmark."""
 
-    def __init__(self, store=None):
+    def __init__(self, store: Any | None = None) -> None:
         self.store = store  # TaskStore (pode ser None)
 
-    def summarize(self, results: list) -> dict:
+    def summarize(self, results: list[BenchmarkResult]) -> BenchmarkSummary:
         total = len(results)
-        finished = sum(1 for r in results if r["finished"])
+        finished = sum(1 for r in results if bool(r.get("finished")))
         return {
             "ts": time.strftime("%Y-%m-%dT%H:%M:%S"),
             "total_tasks": total,
             "finished": finished,
             "finish_rate": round(finished / total, 2) if total else 0.0,
-            "avg_elapsed_s": (round(sum(r["elapsed_s"] for r in results) / total, 2)
+            "avg_elapsed_s": (round(sum(float(r["elapsed_s"]) for r in results) / total, 2)
                               if total else 0.0),
-            "avg_tool_calls": (round(sum(r["tool_calls"] for r in results) / total, 2)
+            "avg_tool_calls": (round(sum(float(r["tool_calls"]) for r in results) / total, 2)
                                if total else 0.0),
-            "avg_retries": (round(sum(r["retries"] for r in results) / total, 2)
+            "avg_retries": (round(sum(float(r["retries"]) for r in results) / total, 2)
                             if total else 0.0),
-            "total_files_created": sum(r["files_created"] for r in results),
+            "total_files_created": sum(int(r["files_created"]) for r in results),
             "tasks": [
                 {k: r[k] for k in ("task_id", "category", "finished",
                                    "checks_passed", "checks_total",
@@ -46,7 +50,7 @@ class BenchmarkReport:
             ],
         }
 
-    def save(self, summary: dict) -> dict:
+    def save(self, summary: BenchmarkSummary) -> BenchmarkSummary:
         if self.store is None:
             return summary
         try:
@@ -56,7 +60,7 @@ class BenchmarkReport:
         return summary
 
     @staticmethod
-    def print_summary(summary: dict):
+    def print_summary(summary: BenchmarkSummary) -> None:
         print("=" * 62)
         print("  BENCHMARK — resumo")
         print("=" * 62)

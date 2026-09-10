@@ -1,0 +1,22 @@
+{
+  "typeCheckingMode": "standard",
+  "venvPath": ".",
+  "venv": ".venv",
+  "include": [
+    "app",
+    "tools",
+    "tests",
+    "data/mongodb",
+    "main.py"
+  ],
+  "exclude": [
+    "**/__pycache__",
+    ".venv",
+    "logs",
+    "models",
+    "bat",
+    "tools/visao"
+  ],
+  "reportMissingImports": "error",
+  "reportAttributeAccessIssue": "error"
+}

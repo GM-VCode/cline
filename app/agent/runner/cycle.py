@@ -5,6 +5,8 @@
 #  o desfecho (ok / feedback). Puro e sem I/O de memória.
 # ============================================================
 
+from typing import Any
+
 from app.agent.checks import CheckRunner
 from app.agent.debug import get_agent_logger
 
@@ -13,13 +15,13 @@ class AttemptCycle:
     """Interpreta UMA resposta do executor e decide o desfecho."""
 
     def __init__(self, checks: CheckRunner, project_dir: str,
-                 check_cmd: list | None = None) -> None:
+                 check_cmd: list[str] | None = None) -> None:
         self.checks = checks
         self.project_dir = project_dir
         self.check_cmd = check_cmd or []
         self.internal_runs = 0
 
-    def settle(self, response: dict | None) -> tuple[bool, str]:
+    def settle(self, response: dict[str, Any] | None) -> tuple[bool, str]:
         """Retorna (ok: bool, output: str).
 
         - ok=True  → verificação passou (ou run interno passou antes)

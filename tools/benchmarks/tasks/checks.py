@@ -51,8 +51,14 @@ def unittest_ok(rel_path: str):
         ok = proc.returncode == 0
         detail = (proc.stderr or proc.stdout or b"").decode(
             "utf-8", errors="replace").strip().splitlines()
-        msg = detail[-1] if detail else ("ok" if ok else "falhou")
-        return ok, f"unittest {'PASSOU' if ok else 'FALHOU'}: {msg[:120]}"
+        if ok:
+            msg = detail[-1] if detail else "ok"
+            return True, f"unittest PASSOU: {msg[:120]}"
+        # falha: devolve os FAIL:/ERROR: reais para o modelo se autocorrigir
+        quebras = [ln.strip() for ln in detail
+                   if ln.strip().startswith(("FAIL:", "ERROR:"))]
+        msg = "; ".join(quebras[:4]) or (detail[-1] if detail else "falhou")
+        return False, f"unittest FALHOU: {msg[:400]}"
     return check
 
 
@@ -68,9 +74,9 @@ def python_expr_ok(module: str, expr: str):
         mod_path = os.path.join(project_dir, f"{module}.py")
         if not os.path.isfile(mod_path):
             return False, f"módulo ausente: {module}.py"
-        code = (f"import {module}; "
+        code = (f"from {module} import *; "
                 f"r = {expr}; "
-                "print('OK' if r else f'FALSO: {expr}')")
+                "print('OK' if r else 'FALSO: ' + " + repr(expr) + ")")
         try:
             proc = subprocess.run(
                 [sys.executable, "-c", code],

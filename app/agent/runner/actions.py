@@ -7,8 +7,10 @@
 # ============================================================
 
 import time
+from typing import Any, Protocol, cast
 
 from app.agent.apply import PatchApplier
+from app.agent.checks import CheckRunner
 from app.agent.debug import get_agent_logger
 
 ACTION_SYSTEM = (
@@ -26,24 +28,34 @@ ACTION_SYSTEM = (
 VALID_ACTIONS = ("write", "edit", "run", "done")
 
 
+class ActionExecutor(Protocol):
+    def execute_action(
+        self,
+        prompt: str,
+        project_dir: str,
+        history: list[dict[str, str]],
+    ) -> dict[str, Any] | None: ...
+
+
 class ActionLoop:
     """Loop ação → observação → próxima ação, com orçamento de passos."""
 
-    def __init__(self, executor, checks, project_dir: str,
-                 check_cmd: list | None = None,
+    def __init__(self, executor: ActionExecutor, checks: CheckRunner,
+                 project_dir: str,
+                 check_cmd: list[str] | None = None,
                  max_actions: int = 8) -> None:
         self.executor = executor
         self.checks = checks
         self.project_dir = project_dir
         self.check_cmd = check_cmd or []
         self.max_actions = max(1, max_actions)
-        self.history = []      # [{"action":..., "observation":...}]
+        self.history: list[dict[str, str]] = []
         self.actions_used = 0
-        self.files_written = []
+        self.files_written: list[str] = []
         self.applier = PatchApplier()
 
     def _feedback(self, extra: str | None = None) -> str:
-        parts = []
+        parts: list[str] = []
         for i, h in enumerate(self.history, 1):
             parts.append(f"passo {i} ({h['action']}): {h['observation'][:300]}")
         if extra:
@@ -51,18 +63,20 @@ class ActionLoop:
         parts.append("Responda com o PRÓXIMO passo (um por vez).")
         return "\n".join(parts)
 
-    def run(self, prompt: str) -> dict:
+    def run(self, prompt: str) -> dict[str, Any]:
         """Executa o loop. Retorna o resultado final padrão do runner."""
         log = get_agent_logger()
         started = time.time()
         ok, output = False, ""
         invalid_streak = 0
-        response = self.executor.execute_action(prompt, self.project_dir, [])
+        response: dict[str, Any] | None = self.executor.execute_action(
+            prompt, self.project_dir, [])
         while True:
             if response is None:
                 ok, output = False, "executor não retornou resposta"
                 break
-            action = (response.get("action") or "").lower()
+            action_value = response.get("action")
+            action = (str(action_value) if action_value is not None else "").lower()
             if not action:
                 # inferência: o modelo respondeu JSON sem 'action'
                 if response.get("files"):
@@ -84,7 +98,8 @@ class ActionLoop:
                         log.debug("ACOES_INVALIDAS_SEGUIDAS: abortando")
                     break
             elif action == "done":
-                ok, output = True, (response.get("note") or "")[:300]
+                note = response.get("note")
+                ok, output = True, (str(note) if note is not None else "")[:300]
                 break
             elif self.actions_used >= self.max_actions:
                 ok = False
@@ -105,8 +120,7 @@ class ActionLoop:
             if log:
                 log.debug(f"ACAO {action}: ok={ok} "
                           f"obs={observation[:200]!r}")
-            if not ok and action == "run" and "erro ao executar" not in output:
-                pass  # falha de comando é observação, não aborta o loop
+            # falha de comando é observação, não aborta o loop
             response = self.executor.execute_action(
                 prompt, self.project_dir, self.history)
         # a palavra final é a verificação oficial, não o 'done'
@@ -127,22 +141,32 @@ class ActionLoop:
             "elapsed_s": round(time.time() - started, 2),
         }
 
-    def _do(self, action: str, response: dict) -> tuple[bool, str]:
+    def _do(self, action: str, response: dict[str, Any]) -> tuple[bool, str]:
         """Executa a ação; retorna (ok, observation)."""
         if action == "write":
-            files = response.get("files") or {}
-            if not isinstance(files, dict) or not files:
+            files_value = response.get("files")
+            if not isinstance(files_value, dict) or not files_value:
                 return False, "write sem 'files' válido"
+            if not all(isinstance(v, str) for v in files_value.values()):
+                # sem isto, valor não-str crashava com TypeError em fh.write
+                return False, ("write: 'files' deve ser {path: conteúdo} "
+                               "com valores str — nada foi escrito")
+            files = cast(dict[str, str], files_value)
             self._write_files(files)
             return True, f"escrito: {sorted(files.keys())}"
         if action == "edit":
-            edits = response.get("edits") or []
+            edits_value = response.get("edits")
+            edits: list[dict[str, Any]] = (
+                cast(list[dict[str, Any]], edits_value)
+                if isinstance(edits_value, list)
+                else []
+            )
             # tolerância: campos diretos na ação (file/find/replace no topo)
             if not edits and response.get("find") is not None:
                 edits = [{"file": response.get("file"),
                           "find": response.get("find"),
                           "replace": response.get("replace")}]
-            if not isinstance(edits, list) or not edits:
+            if not edits:
                 return False, ("edit sem 'edits' válido — nada foi "
                                "modificado. Formato: {\"action\": \"edit\", "
                                "\"edits\": [{\"file\", \"find\", \"replace\"}]}")
@@ -151,20 +175,20 @@ class ActionLoop:
                     else "EDITS REJEITADOS (nada modificado): "
                          + "; ".join(report))
         if action == "run":
-            cmd = response.get("cmd") or response.get("run")
-            if not cmd:
+            cmd_value = response.get("cmd") or response.get("run")
+            if not isinstance(cmd_value, str) or not cmd_value:
                 return False, "run sem 'cmd'"
-            ok, out = self.checks.run_shell(cmd, self.project_dir)
-            return ok, (f"$ {cmd}\n{out[:800]}" if out
-                        else f"$ {cmd} (sem saída)")
+            ok, out = self.checks.run_shell(cmd_value, self.project_dir)
+            return ok, (f"$ {cmd_value}\n{out[:800]}" if out
+                        else f"$ {cmd_value} (sem saída)")
         return False, f"ação não implementada: {action}"
 
-    def _write_files(self, files: dict) -> None:
+    def _write_files(self, files: dict[str, str]) -> None:
         import os
         base = os.path.abspath(self.project_dir)
         for rel, content in files.items():
             path = os.path.abspath(os.path.join(base, rel))
-            if not path.startswith(base):
+            if not path.startswith(base + os.sep):  # irmão não é "dentro"
                 continue
             os.makedirs(os.path.dirname(path), exist_ok=True)
             with open(path, "w", encoding="utf-8", newline="") as fh:

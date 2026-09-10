@@ -12,6 +12,8 @@
 import hashlib
 import json
 import threading
+from collections.abc import Callable
+from typing import Any
 
 NUDGE_TEMP = 0.7
 STRONG_TEMP = 0.9
@@ -41,22 +43,26 @@ class LoopGuard:
     temperature bump para quebrar o determinismo.
     """
 
-    def __init__(self, clock=None) -> None:
+    def __init__(self, clock: Callable[[], float] | None = None) -> None:
         self._counts: dict[str, int] = {}      # "sid|hash" → repetições
         self._last: dict[str, str] = {}        # sid → último hash
         self._lock = threading.Lock()
-        self._clock = clock  # reservado p/ expiração futura de sessões
+        self._clock: Callable[[], float] | None = clock
 
     # ---------- hash ----------
-    def request_hash(self, body: dict) -> str:
+    def request_hash(self, body: dict[str, Any]) -> str:
         """Hash estável das mensagens (ignora temperature/seed/etc).
 
         Nunca levanta: body malformado vira hash de sua serialização.
         """
         try:
-            messages = body.get("messages") if isinstance(body, dict) else None
-            payload = json.dumps(messages, sort_keys=True,
-                                 ensure_ascii=False, default=str)
+            messages: object = body.get("messages")
+            payload = json.dumps(
+                messages,
+                sort_keys=True,
+                ensure_ascii=False,
+                default=str,
+            )
         except (TypeError, ValueError):
             payload = repr(body)
         return hashlib.sha256(payload.encode("utf-8")).hexdigest()

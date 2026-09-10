@@ -17,6 +17,7 @@ def feature_com_testes_longa() -> BenchmarkTask:
         "(1) string_utils.py na raiz, contendo:\n"
         "    - def slugify(text): converte para slug minúsculo "
         "(acentos removidos, espaços e pontuação viram hífen, "
+        "hífens já existentes contam como separador e NÃO duplicam, "
         "sem hífens duplos e sem hífens nas pontas);\n"
         "    - def truncate(text, limit): corta o texto em `limit` "
         "caracteres adicionando '...' quando cortar (nunca passando "
@@ -46,7 +47,7 @@ def feature_com_testes_longa() -> BenchmarkTask:
          ("testes_passam", unittest_ok("test_string_utils.py")),
          ("slugify_acentos", python_expr_ok(
              "string_utils",
-             "slugify('Ação é gru-nto') == 'acao-e-grunto'")),
+             "slugify('Ação é gru-nto') == 'acao-e-gru-nto'")),
          ("truncate_corta", python_expr_ok(
              "string_utils",
              "truncate('abcdefghij', 5) == 'abcde...'")),

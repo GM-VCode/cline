@@ -7,7 +7,7 @@
 #  o .env da raiz do projeto.
 #
 #  Uso:  .venv\Scripts\python.exe main.py
-#        (ou pelo atalho INICIAR-Qwythos-9B na raiz)
+#        (ou pelo atalho LunarIA-Stack-Completa / INICIAR-LunarIA.bat)
 # ============================================================
 
 import os

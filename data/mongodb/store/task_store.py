@@ -6,6 +6,8 @@
 # ============================================================
 
 import os
+import time
+from typing import Any
 
 from data.mongodb.connection import MongoConnection
 from data.mongodb.store.runtime import RuntimePaths
@@ -19,7 +21,8 @@ class TaskStore:
     def __init__(self, uri: str | None = None, db: str | None = None,
                  state_path: str | None = None,
                  validations_path: str | None = None,
-                 timeout_ms: int = 2000):
+                 timeout_ms: int = 2000,
+                 model_name: str | None = None) -> None:
         self.paths = RuntimePaths()
         if uri:
             self.paths.uri = uri
@@ -37,12 +40,15 @@ class TaskStore:
         self.task_id = self.paths.task_id
         self.uri = self.paths.uri
         self.db_name = self.paths.db_name
+        # Benchmarks: coleção ÚNICA; 1 doc por modelo (chave = model_name)
+        # com o histórico de corridas agrupado no timeline do doc.
+        self.model_name = model_name or ""
 
-        self._conn: "MongoConnection | None" = None
+        self._conn: MongoConnection = MongoConnection(
+            self.uri, self.db_name, timeout_ms
+        )
         self._error: str | None = None
-        if MongoConnection is not None:
-            self._conn = MongoConnection(self.uri, self.db_name, timeout_ms)
-            self._error = self._conn.error
+        self._error = self._conn.error
 
         self.state = StateRepo(
             self._conn, self.paths.state_path, self.task_id,
@@ -60,7 +66,7 @@ class TaskStore:
             self._conn, "agent_runs", self.paths.agent_runs_path,
             "agent_run", self.task_id, self._catch_error)
 
-    def _catch_error(self, msg: str):
+    def _catch_error(self, msg: str) -> None:
         self._error = msg
 
     @property
@@ -68,44 +74,57 @@ class TaskStore:
         return bool(self._conn and self._conn.active)
 
     @property
-    def error(self):
+    def error(self) -> str | None:
         return self._error
 
     # ---------- estado ----------
-    def save_state(self, payload: dict, task_id: str | None = None) -> dict:
+    def save_state(self, payload: dict[str, Any], task_id: str | None = None) -> dict[str, Any]:
         return self.state.save(payload, task_id=task_id)
 
-    def load_state(self, task_id: str | None = None) -> dict:
+    def load_state(self, task_id: str | None = None) -> dict[str, Any]:
         return self.state.load(task_id=task_id)
 
     # ---------- validações ----------
-    def append_validation(self, entry: dict) -> dict:
+    def append_validation(self, entry: dict[str, Any]) -> dict[str, Any]:
         return self.validations.append(entry)
 
-    def list_validations(self, limit: int = 20) -> list:
+    def list_validations(self, limit: int = 20) -> list[dict[str, Any]]:
         return self.validations.list(limit)
 
     # ---------- diagnósticos ----------
-    def append_diagnostic(self, entry: dict) -> dict:
+    def append_diagnostic(self, entry: dict[str, Any]) -> dict[str, Any]:
         return self.diagnostics.append(entry)
 
-    def list_diagnostics(self, limit: int = 20) -> list:
+    def list_diagnostics(self, limit: int = 20) -> list[dict[str, Any]]:
         return self.diagnostics.list(limit)
 
     # ---------- benchmarks ----------
-    def append_benchmark(self, entry: dict) -> dict:
-        return self.benchmarks.append(entry)
+    def _bench_model(self) -> str:
+        """Chave única do modelo nos docs de benchmark_runs."""
+        return self.model_name or "unknown"
 
-    def list_benchmarks(self, limit: int = 20) -> list:
-        return self.benchmarks.list(limit)
+    def append_benchmark(self, entry: dict[str, Any]) -> dict[str, Any]:
+        """Grava 1 corrida no doc do modelo (1 doc por model em
+        benchmark_runs; corridas agrupadas no timeline do doc)."""
+        modelo = self._bench_model()
+        entry.setdefault("model", modelo)
+        ts = entry.setdefault(
+            "ts", time.strftime("%Y-%m-%dT%H:%M:%S"))
+        return self.benchmarks.upsert(
+            {"model": modelo, "last_run": ts},
+            task_id=f"bench:{modelo}", event=entry)
+
+    def list_benchmarks(self, limit: int = 20) -> list[dict[str, Any]]:
+        """Docs por modelo (model + timeline de corridas)."""
+        return self.benchmarks.list(limit, task_id=f"bench:{self._bench_model()}")
 
     # ---------- execuções do agente ----------
-    def append_agent_run(self, entry: dict,
-                         task_id: str | None = None) -> dict:
+    def append_agent_run(self, entry: dict[str, Any],
+                         task_id: str | None = None) -> dict[str, Any]:
         return self.agent_runs.append(entry, task_id=task_id)
 
-    def upsert_agent_run(self, entry: dict, task_id: str | None = None,
-                         event: dict | None = None) -> dict:
+    def upsert_agent_run(self, entry: dict[str, Any], task_id: str | None = None,
+                         event: dict[str, Any] | None = None) -> dict[str, Any]:
         """1 documento por conversa: atualiza o doc do task_id ou cria.
 
         Mantém o agente_runs limpo (sem duplicatas por request). É a forma
@@ -115,14 +134,13 @@ class TaskStore:
         """
         return self.agent_runs.upsert(entry, task_id=task_id, event=event)
 
-    def get_agent_run(self, task_id: str | None = None) -> dict | None:
+    def get_agent_run(self, task_id: str | None = None) -> dict[str, Any] | None:
         """Documento único da conversa no agent_runs (ou None)."""
         return self.agent_runs.get_one(task_id)
 
     def list_agent_runs(self, limit: int = 20,
-                        task_id: str | None = None) -> list:
+                        task_id: str | None = None) -> list[dict[str, Any]]:
         return self.agent_runs.list(limit, task_id=task_id)
 
-    def close(self):
-        if self._conn is not None:
-            self._conn.close()
+    def close(self) -> None:
+        self._conn.close()

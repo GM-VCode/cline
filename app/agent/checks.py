@@ -20,7 +20,10 @@ class CheckRunner:
                 check_cmd, cwd=project_dir,
                 capture_output=True, text=True, timeout=self.timeout)
             output = (proc.stdout or "") + (proc.stderr or "")
-            return proc.returncode == 0, output.strip()
+            cleaned = output.strip()
+            if proc.returncode != 0 and not cleaned:
+                cleaned = f"check exited with code {proc.returncode}"
+            return proc.returncode == 0, cleaned
         except (OSError, subprocess.TimeoutExpired, ValueError) as exc:
             return False, f"erro ao executar check: {exc}"
 
@@ -31,13 +34,16 @@ class CheckRunner:
                 cmd, cwd=project_dir, shell=True,
                 capture_output=True, text=True, timeout=self.timeout)
             output = (proc.stdout or "") + (proc.stderr or "")
-            return proc.returncode == 0, output.strip()
+            cleaned = output.strip()
+            if proc.returncode != 0 and not cleaned:
+                cleaned = f"run exited with code {proc.returncode}"
+            return proc.returncode == 0, cleaned
         except (OSError, subprocess.TimeoutExpired, ValueError) as exc:
             return False, f"erro ao executar run: {exc}"
 
     @staticmethod
     def feedback_from(instruction: str, output: str,
-                      prev_files: dict | None = None) -> str:
+                      prev_files: dict[str, str] | None = None) -> str:
         """Monta o feedback (2.ª tentativa) a partir da falha."""
         parts = [
             "Sua tentativa anterior não passou na verificação.",

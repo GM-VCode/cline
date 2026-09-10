@@ -6,6 +6,7 @@
 # ============================================================
 
 import os
+from typing import Iterator
 
 SKIP_DIRS = {".git", "node_modules", ".venv", "__pycache__",
              "dist", "build", ".idea", ".vscode"}
@@ -29,7 +30,7 @@ class ProjectContext:
     def _is_skip(self, root: str, name: str) -> bool:
         return name in SKIP_DIRS or name.startswith(".")
 
-    def _walk_files(self):
+    def _walk_files(self) -> Iterator[str]:
         for root, dirs, files in os.walk(self.project_dir):
             dirs[:] = [d for d in dirs if not self._is_skip(root, d)]
             for name in sorted(files):
@@ -38,7 +39,9 @@ class ProjectContext:
                 yield os.path.join(root, name)
 
     def _collect(self) -> tuple[list[str], list[str], int]:
-        tree, details, budget = [], [], 0
+        tree: list[str] = []
+        details: list[str] = []
+        budget = 0
         for path in self._walk_files():
             rel = os.path.relpath(path, self.project_dir).replace("\\", "/")
             tree.append(rel)

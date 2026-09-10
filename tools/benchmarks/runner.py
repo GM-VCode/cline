@@ -11,7 +11,10 @@ import os
 import shutil
 import tempfile
 import time
-from typing import TYPE_CHECKING
+from typing import Any, TYPE_CHECKING
+
+from tools.benchmarks.seeds import BenchmarkProjectSeeder
+from tools.benchmarks.tasks.core import BenchmarkTask, CheckResult
 
 if TYPE_CHECKING:  # só p/ anotações (import real é lazy no __init__)
     from app.agent.checks import CheckRunner
@@ -25,27 +28,42 @@ class ModelExecutor:
     e aplicando as edições no projeto (via Cline ou API).
     """
 
-    def execute(self, instruction: str, project_dir: str) -> dict:
+    def execute(self, instruction: str, project_dir: str) -> dict[str, Any]:
         raise NotImplementedError("Plugue um executor real do modelo")
 
     def execute_with_feedback(self, instruction: str, project_dir: str,
-                              feedback: str) -> dict:
+                              feedback: str) -> dict[str, Any]:
         """2.ª tentativa: recebe o feedback dos checks que falharam.
         Default: delega para execute (executores simples ignoram)."""
         return self.execute(instruction, project_dir)
+
+    def execute_action(
+        self,
+        prompt: str,
+        project_dir: str,
+        history: list[dict[str, str]],
+    ) -> dict[str, Any] | None:
+        """Adaptador para o modo iterativo de ações.
+
+        Executores simples ainda podem implementar apenas ``execute``;
+        executores interativos podem sobrescrever este método.
+        """
+        _ = history
+        return self.execute(prompt, project_dir)
 
 
 class BenchmarkRunner:
     """Roda tarefas do benchmark e coleta métricas por tarefa."""
 
-    def __init__(self, executor: ModelExecutor, tasks: list,
+    def __init__(self, executor: ModelExecutor, tasks: list[BenchmarkTask],
                  work_root: str | None = None, max_attempts: int = 2,
-                 max_actions: int | None = None):
+                 max_actions: int | None = None) -> None:
         self.executor = executor
         self.tasks = tasks
         self.work_root = work_root or tempfile.gettempdir()
         self.max_attempts = max(1, max_attempts)
         self.max_actions = max_actions  # 11c: None = ciclo clássico
+        self.seeder = BenchmarkProjectSeeder()
         self._checks: "CheckRunner | None" = None
         if max_actions is not None:
             from app.agent.checks import CheckRunner
@@ -59,54 +77,24 @@ class BenchmarkRunner:
         os.makedirs(project_dir, exist_ok=True)
         return project_dir
 
-    def _seed_project(self, task, project_dir: str):
-        """Semear arquivos iniciais quando a tarefa exige (ex.: bug)."""
-        seeds = {
-            "002_editar_funcao": {
-                "calc.py": "def add(a, b):\n    return a + b\n",
-            },
-            "004_bug_multi_arquivo": {
-                "src/app.py": "from src.utils.helpers import needed\\n\\n\\ndef main():\\n    return needed()\\n",
-            },
-            "005_feature_com_testes": {
-                "string_utils.py": "def slugify(text):\n    return text  # TODO: implementar\n",
-            },
-            "006_refactor_sem_quebrar": {
-                "calc.py": "def add(a, b):\n    return a + b\n",
-            },
-            "007_interpretar_erro": {
-                "main.py": "from calc import add\n\nprint(add(1, 2))\n",
-            },
-            "009_codigo_e_docs": {
-                "calc.py": "def add(a, b):\n    return a + b\n",
-            },
-            "008_projeto_desconhecido": {
-                "src/app.py": "from src.core import process\n\ndef main():\n    return process()\n",
-            },
-            "010_consertar_incompleto": {
-                "calc.py": "def add(a, b, c)\\n    return a + b + c\\n",
-            },
-        }
-        for rel, content in seeds.get(task.task_id, {}).items():
-            path = os.path.join(project_dir, rel)
-            os.makedirs(os.path.dirname(path), exist_ok=True)
-            with open(path, "w", encoding="utf-8") as f:
-                f.write(content)
-
-    def run_task(self, task) -> dict:
+    def run_task(self, task: BenchmarkTask) -> dict[str, Any]:
         """Executa uma tarefa e retorna métricas + resultado dos checks."""
         project_dir = self._fresh_project(task.task_id)
-        self._seed_project(task, project_dir)
+        self.seeder.seed(task, project_dir)
 
         started = time.time()
         retries = 0
-        response, error = None, None
-        checks = []
+        response: dict[str, Any] | None = None
+        error: str | None = None
+        checks: list[CheckResult] = []
         # 11c: modo iterativo — ActionLoop em vez do ciclo clássico
         if self.max_actions is not None:
             from app.agent.runner.actions import ActionLoop
+            checks_runner = self._checks
+            if checks_runner is None:
+                raise RuntimeError("CheckRunner não inicializado")
             for cycle in range(1, self.max_attempts + 1):
-                loop = ActionLoop(self.executor, self._checks, project_dir,
+                loop = ActionLoop(self.executor, checks_runner, project_dir,
                                   check_cmd=[],  # checks são callables
                                   max_actions=self.max_actions)
                 if cycle > 1:
@@ -134,7 +122,11 @@ class BenchmarkRunner:
                         error = None
                         retries += 1
                 except Exception as exc:  # pragma: no cover
-                    response, error = None, str(exc)
+                    response = None
+                    error = str(exc) or type(exc).__name__
+                    # hiccup transitório: consome a tentativa, não a tarefa
+                    if attempt < self.max_attempts:
+                        continue
                     break
                 checks = task.run_checks(project_dir)
                 if all(ok for _, ok, _ in checks):
@@ -183,7 +175,7 @@ class BenchmarkRunner:
         }
 
     @staticmethod
-    def _format_feedback(checks: list) -> str:
+    def _format_feedback(checks: list[CheckResult]) -> str:
         """Monta o feedback com os checks que falharam (2.ª tentativa)."""
         lines = ["Sua resposta anterior não passou na validação. Falhas:"]
         for name, ok, msg in checks:
@@ -200,5 +192,5 @@ class BenchmarkRunner:
             total += len(files)
         return total
 
-    def run_all(self) -> list:
+    def run_all(self) -> list[dict[str, Any]]:
         return [self.run_task(t) for t in self.tasks]

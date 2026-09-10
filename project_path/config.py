@@ -66,12 +66,16 @@ class Config:
             os.path.join(self.BASE_DIR, ".env"))
 
         self.LOG_DIR: str = ProjectPath.LOG_DIR
-        self.LOG_OUT: str = os.path.join(self.LOG_DIR,
+        # Logs organizados em subpastas (não misturar tudo em logs/)
+        #   logs/proxy_and_server → llama-server, proxy, stack e status
+        #   logs/model            → logs geradas nos testes de bench
+        #   logs/app              → app.log + agent.log (runtime)
+        self.LOG_OUT: str = os.path.join(self.LOG_DIR, "proxy_and_server",
                                          "llama-server.out.log")
-        self.LOG_ERR: str = os.path.join(self.LOG_DIR,
+        self.LOG_ERR: str = os.path.join(self.LOG_DIR, "proxy_and_server",
                                          "llama-server.err.log")
-        self.APP_LOG: str = os.path.join(self.LOG_DIR, "app.log")
-        self.AGENT_LOG: str = os.path.join(self.LOG_DIR, "agent.log")
+        self.APP_LOG: str = os.path.join(self.LOG_DIR, "app", "app.log")
+        self.AGENT_LOG: str = os.path.join(self.LOG_DIR, "app", "agent.log")
 
         # Binario do llama.cpp (global, fora do repo)
         self.LLAMA_SERVER: str = r"C:\llama.cpp\llama-server.exe"

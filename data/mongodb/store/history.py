@@ -5,48 +5,74 @@
 # ============================================================
 
 import time
+from collections.abc import Callable, Iterable
+from typing import Any, cast
 
+from pymongo.collection import Collection
+
+from data.mongodb.connection import MongoConnection
 from data.mongodb.store.json_file import JsonFile
+
+Document = dict[str, Any]
+
+
+MongoCollection = Collection[Document]
+
+
+def _ignore_error(_message: str) -> None:
+    pass
 
 
 class HistoryCollection:
     """Append/list com Mongo (se ativo) e fallback a arquivo JSON."""
 
-    def __init__(self, conn, coll_name: str, json_path: str, label: str,
-                 task_id: str = "current", error_sink=None):
+    def __init__(self, conn: MongoConnection | None, coll_name: str,
+                 json_path: str, label: str, task_id: str = "current",
+                 error_sink: Callable[[str], None] | None = None) -> None:
         self.conn = conn
         self.coll_name = coll_name
         self.json_path = json_path
         self.label = label          # p/ mensagens de erro
         self.task_id = task_id
-        self.error_sink = error_sink or (lambda msg: None)
-        self.last_backend = None    # "mongo" | "json" no último append
+        self.error_sink: Callable[[str], None] = error_sink or _ignore_error
+        self.last_backend: str | None = None
 
     @property
-    def _coll(self):
+    def _coll(self) -> MongoCollection | None:
         """Coleção Mongo ativa (None se sem conexão ou Mongo off)."""
         if self.conn is not None and self.conn.active:
             return self.conn.collection(self.coll_name)
         return None
 
-    def append(self, entry: dict, task_id: str | None = None) -> dict:
-        if not isinstance(entry, dict):
-            entry = {"value": entry}
-        entry = dict(entry)
-        entry.setdefault("task_id", task_id or self.task_id)
-        entry.setdefault("ts", time.strftime("%Y-%m-%dT%H:%M:%S"))
+    @staticmethod
+    def _document(value: object) -> Document:
+        if isinstance(value, dict):
+            return cast(Document, value)
+        return {"value": value}
+
+    @staticmethod
+    def _history(value: object) -> list[Document]:
+        if not isinstance(value, list):
+            return []
+        items: list[Any] = cast(list[Any], value)
+        return [cast(Document, item) for item in items if isinstance(item, dict)]
+
+    def append(self, entry: object, task_id: str | None = None) -> Document:
+        document = self._document(entry)
+        document.setdefault("task_id", task_id or self.task_id)
+        document.setdefault("ts", time.strftime("%Y-%m-%dT%H:%M:%S"))
         coll = self._coll
         if coll is not None:
             try:
-                coll.insert_one(dict(entry))
+                coll.insert_one(document)
                 self.last_backend = "mongo"
-                return entry
+                return document
             except Exception as exc:  # pragma: no cover
                 self.error_sink(f"Falha Mongo ({self.coll_name}): {exc}")
-        return self._append_json(entry)
+        return self._append_json(document)
 
-    def upsert(self, entry: dict, task_id: str | None = None,
-               event: dict | None = None) -> dict:
+    def upsert(self, entry: object, task_id: str | None = None,
+               event: Document | None = None) -> Document:
         """Atualiza o registro existente da conversa ou cria se não existir.
 
         Mantém exatamente 1 documento por task_id (não acumula duplicatas):
@@ -54,23 +80,21 @@ class HistoryCollection:
         antigos e ``ts``/``last_update`` refletem o request mais recente.
         ``event`` (opcional) é anexado à timeline (event sourcing).
         """
-        if not isinstance(entry, dict):
-            entry = {"value": entry}
-        entry = dict(entry)
+        document = self._document(entry)
         tid = task_id or self.task_id
         now = time.strftime("%Y-%m-%dT%H:%M:%S")
-        entry.setdefault("task_id", tid)
-        entry.setdefault("ts", now)
+        document.setdefault("task_id", tid)
+        document.setdefault("ts", now)
         coll = self._coll
         if coll is not None:
             try:
-                sets = dict(entry)
+                sets = dict(document)
                 sets["last_update"] = now
                 # created_at vem do doc base; nunca pode estar em $set E
                 # $setOnInsert ao mesmo tempo (conflito no MongoDB).
                 created = sets.pop("created_at", now)
-                update = {"$set": sets,
-                          "$setOnInsert": {"created_at": created}}
+                update: Document = {"$set": sets,
+                                    "$setOnInsert": {"created_at": created}}
                 if event is not None:
                     update["$push"] = {"timeline": event}
                 coll.update_one({"task_id": tid}, update, upsert=True)
@@ -78,20 +102,23 @@ class HistoryCollection:
                 return sets
             except Exception as exc:  # pragma: no cover
                 self.error_sink(f"Falha Mongo (upsert {self.coll_name}): {exc}")
-        return self._upsert_json(entry, tid, event)
+        return self._upsert_json(document, tid, event)
 
-    def _upsert_json(self, entry: dict, tid: str,
-                     event: dict | None = None) -> dict:
-        history = JsonFile.read(self.json_path)
-        if not isinstance(history, list):
-            history = []
+    def _upsert_json(self, entry: Document, tid: str,
+                     event: Document | None = None) -> Document:
+        history = self._history(JsonFile.read(self.json_path))
         now = time.strftime("%Y-%m-%dT%H:%M:%S")
         for i, old in enumerate(history):
-            if isinstance(old, dict) and old.get("task_id") == tid:
+            if old.get("task_id") == tid:
                 merged = dict(old)
                 merged.update(entry)
                 if event is not None:
-                    timeline = list(merged.get("timeline") or [])
+                    value = merged.get("timeline")
+                    timeline: list[Document] = (
+                        cast(list[Document], value)
+                        if isinstance(value, list)
+                        else []
+                    )
                     timeline.append(event)
                     merged["timeline"] = timeline
                 merged["last_update"] = now
@@ -107,7 +134,7 @@ class HistoryCollection:
         self.last_backend = "json"
         return entry
 
-    def get_one(self, task_id: str | None = None) -> dict | None:
+    def get_one(self, task_id: str | None = None) -> Document | None:
         """Documento único da conversa (None se ainda não existe)."""
         tid = task_id or self.task_id
         coll = self._coll
@@ -116,42 +143,36 @@ class HistoryCollection:
                 doc = coll.find_one({"task_id": tid})
                 if doc is None:
                     return None
-                return {k: v for k, v in doc.items() if k != "_id"}
+                return {
+                    k: v for k, v in doc.items() if k != "_id"
+                }
             except Exception as exc:  # pragma: no cover
                 self.error_sink(f"Falha Mongo (get_one {self.coll_name}): {exc}")
-        history = JsonFile.read(self.json_path)
-        if not isinstance(history, list):
-            return None
+        history = self._history(JsonFile.read(self.json_path))
         for e in reversed(history):
-            if isinstance(e, dict) and e.get("task_id") == tid:
+            if e.get("task_id") == tid:
                 return e
         return None
 
-    def list(self, limit: int = 20, task_id: str | None = None) -> list:
+    def list(self, limit: int = 20, task_id: str | None = None) -> list[Document]:
         tid = task_id or self.task_id
         coll = self._coll
         if coll is not None:
             try:
-                cursor = (coll.find({"task_id": tid})
-                          .sort("_id", -1).limit(limit))
-                out = [{k: v for k, v in doc.items() if k != "_id"}
-                       for doc in cursor]
+                cursor: Iterable[Document] = (coll.find({"task_id": tid})
+                                              .sort("_id", -1).limit(limit))
+                out: list[Document] = [{k: v for k, v in doc.items() if k != "_id"}
+                                       for doc in cursor]
                 return out
             except Exception as exc:  # pragma: no cover
                 self.error_sink(f"Falha Mongo (list {self.coll_name}): {exc}")
-        history = JsonFile.read(self.json_path)
-        if not isinstance(history, list):
-            return []
+        history = self._history(JsonFile.read(self.json_path))
         # fallback JSON é um arquivo único: filtra pelo task_id
-        history = [e for e in history
-                   if isinstance(e, dict)
-                   and e.get("task_id") == tid]
+        history = [e for e in history if e.get("task_id") == tid]
         return list(reversed(history[-limit:]))
 
-    def _append_json(self, entry: dict) -> dict:
-        history = JsonFile.read(self.json_path)
-        if not isinstance(history, list):
-            history = []
+    def _append_json(self, entry: Document) -> Document:
+        history = self._history(JsonFile.read(self.json_path))
         history.append(entry)
         JsonFile.write(self.json_path, history)
         self.last_backend = "json"

@@ -7,7 +7,7 @@
 
 import os
 import time
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING, Any, Protocol, cast
 
 from app.agent.checks import CheckRunner
 from app.agent.debug import get_agent_logger
@@ -25,14 +25,35 @@ class TaskStoreProtocol(Protocol):
     (ProxyRecorder) — o runner grava apenas o estado da tarefa.
     """
 
-    def save_state(self, payload: dict,
-                   task_id: str | None = None) -> dict: ...
+    def save_state(self, payload: dict[str, Any],
+                   task_id: str | None = None) -> dict[str, Any]: ...
+
+
+class ExecutorProtocol(Protocol):
+    def execute(self, instruction: str, /,
+                project_dir: str) -> dict[str, Any]: ...
+
+    def execute_with_feedback(
+        self,
+        instruction: str,
+        /,
+        project_dir: str,
+        feedback: str,
+    ) -> dict[str, Any]: ...
+
+    def execute_action(
+        self,
+        prompt: str,
+        project_dir: str,
+        history: list[dict[str, str]],
+    ) -> dict[str, Any] | None: ...
 
 
 class AgentRunner:
     """Executa uma tarefa de código com o modelo + verificação real."""
 
-    def __init__(self, executor, check_cmd: list | None = None,
+    def __init__(self, executor: ExecutorProtocol,
+                 check_cmd: list[str] | None = None,
                  max_attempts: int = 2, check_timeout: int = 120,
                  use_context: bool = True,
                  identity: "AgentIdentity | None" = None,
@@ -47,13 +68,13 @@ class AgentRunner:
         self.store = store  # TaskStore opcional: registra cada execução
         self.max_actions = max_actions  # 11c: ativa o modo iterativo
 
-    def run(self, instruction: str, project_dir: str) -> dict:
+    def run(self, instruction: str, project_dir: str) -> dict[str, Any]:
         """Ciclo completo + registro na memória (se store configurado)."""
         result = self._run_cycle(instruction, project_dir)
         self._record(instruction, project_dir, result)
         return result
 
-    def _run_cycle(self, instruction: str, project_dir: str) -> dict:
+    def _run_cycle(self, instruction: str, project_dir: str) -> dict[str, Any]:
         """Ciclo: modelo -> aplica -> verifica -> retry (até max_attempts)."""
         if not os.path.isdir(project_dir):
             return {"finished": False, "error": "projeto não existe",
@@ -73,8 +94,7 @@ class AgentRunner:
         started = time.time()
         attempts, retries = 0, 0
         ok, output, files = False, "", []
-        internal_runs = 0
-        response: dict | None = None
+        response: dict[str, Any] | None = None
         log = get_agent_logger()
         cycle = AttemptCycle(self.checks, project_dir, self.check_cmd)
         for attempt in range(1, self.max_attempts + 1):
@@ -83,7 +103,12 @@ class AgentRunner:
                 if attempt == 1:
                     response = self.executor.execute(prompt, project_dir)
                 else:
-                    prev_files = (response or {}).get("files", {})
+                    files_value = (response or {}).get("files", {})
+                    prev_files = (
+                        cast(dict[str, str], files_value)
+                        if isinstance(files_value, dict)
+                        else {}
+                    )
                     feedback = CheckRunner.feedback_from(
                         instruction, output, prev_files=prev_files)
                     if log:
@@ -95,7 +120,14 @@ class AgentRunner:
                 return {"finished": False, "error": str(exc),
                         "attempts": attempts, "retries": retries,
                         "elapsed_s": round(time.time() - started, 2)}
-            files = response.get("files_written", []) if response else []
+            files_value: object = (
+                response.get("files_written", []) if response else []
+            )
+            files = (
+                cast(list[str], files_value)
+                if isinstance(files_value, list)
+                else []
+            )
             ok, output = cycle.settle(response)
             if ok:
                 break
@@ -111,7 +143,8 @@ class AgentRunner:
             "elapsed_s": round(time.time() - started, 2),
         }
 
-    def _record(self, instruction: str, project_dir: str, result: dict):
+    def _record(self, instruction: str, project_dir: str,
+                result: dict[str, Any]) -> None:
         """Registra o estado da tarefa (coleção tasks + data/json/task-state.json).
 
         NOTA: agent_runs é gerenciado SOMENTE pelo proxy (ProxyRecorder).

@@ -12,6 +12,7 @@
 import argparse
 import os
 import sys
+from typing import TYPE_CHECKING
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -21,15 +22,18 @@ ProjectPath.ensure()
 from app.agent.debug import get_agent_logger  # noqa: E402
 from app.services.proxy import ProxyServer  # noqa: E402
 
+if TYPE_CHECKING:
+    from app.task_store import TaskStore
+
 
 class ProxyCLI:
     """Ponto de entrada do proxy pela linha de comando."""
 
-    def __init__(self, argv: list | None = None):
+    def __init__(self, argv: list[str] | None = None) -> None:
         self.args = self._parse(argv)
 
     @staticmethod
-    def _parse(argv):
+    def _parse(argv: list[str] | None) -> argparse.Namespace:
         p = argparse.ArgumentParser(
             description="Proxy de memória: Cline -> llama-server -> Mongo")
         p.add_argument("--host", default="127.0.0.1",
@@ -42,7 +46,7 @@ class ProxyCLI:
                        help="só repassar; não gravar no Mongo/JSON")
         return p.parse_args(argv)
 
-    def _make_store(self):
+    def _make_store(self) -> "TaskStore | None":
         if self.args.no_memory:
             return None
         try:
@@ -54,7 +58,7 @@ class ProxyCLI:
                 log.warn(f"proxy: TaskStore não criado ({exc})")
             return None
 
-    def _report_memory(self, store) -> None:
+    def _report_memory(self, store: "TaskStore | None") -> None:
         log = get_agent_logger()
         if store is None:
             motivo = ("--no-memory" if self.args.no_memory

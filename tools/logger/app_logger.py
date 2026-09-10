@@ -8,6 +8,8 @@
 
 import os
 import traceback
+from types import TracebackType
+from typing import cast
 
 from project_path import Config
 from tools.logger.formatter import LogFormatter
@@ -104,7 +106,12 @@ class AppLogger:
             if exc_info is True:
                 text = traceback.format_exc()
             elif isinstance(exc_info, tuple):
-                text = "".join(traceback.format_exception(*exc_info))
+                info = cast(
+                    tuple[type[BaseException] | None, BaseException | None,
+                          TracebackType | None],
+                    exc_info,
+                )
+                text = "".join(traceback.format_exception(*info))
             else:
                 text = str(exc_info)
 

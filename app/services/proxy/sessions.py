@@ -8,19 +8,20 @@
 import re
 import threading
 import time
+from typing import Any
 
 
 class SessionRegistry:
     """Registro em memória das sessões de chat ativas no proxy."""
 
-    def __init__(self, clock=None):
+    def __init__(self, clock: Any = None) -> None:
         self._lock = threading.Lock()
-        self._sessions = {}          # sid -> {first_seen, last_seen, count}
+        self._sessions: dict[str, dict[str, Any]] = {}
         self._clock = clock or time.time
 
     # ---------- identificação ----------
     @staticmethod
-    def first_user_text(messages) -> str:
+    def first_user_text(messages: Any) -> str:
         """Texto da 1.ª mensagem do usuário (string ou lista multimodal)."""
         for msg in messages or []:
             if not isinstance(msg, dict) or msg.get("role") != "user":
@@ -37,7 +38,7 @@ class SessionRegistry:
         return ""
 
     @classmethod
-    def session_id(cls, body: dict) -> str:
+    def session_id(cls, body: dict[str, Any]) -> str:
         """ID estável da sessão para o corpo da requisição."""
         sid = body.get("session_id") or body.get("sessionId")
         if sid:
@@ -49,7 +50,7 @@ class SessionRegistry:
         return "default"
 
     # ---------- ciclo de vida ----------
-    def touch(self, body: dict) -> dict:
+    def touch(self, body: dict[str, Any]) -> dict[str, Any]:
         """Registra/reconhece a sessão e devolve o snapshot dela."""
         sid = self.session_id(body)
         now = time.strftime("%Y-%m-%dT%H:%M:%S")
@@ -63,6 +64,6 @@ class SessionRegistry:
             sess["count"] += 1
             return dict(sess)
 
-    def summary(self) -> dict:
+    def summary(self) -> dict[str, dict[str, Any]]:
         with self._lock:
             return {sid: dict(s) for sid, s in self._sessions.items()}

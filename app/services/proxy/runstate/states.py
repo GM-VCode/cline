@@ -11,6 +11,7 @@
 # ============================================================
 
 import time
+from typing import Any
 
 # ---------- estados ----------
 IN_PROGRESS = "in_progress"
@@ -30,7 +31,7 @@ def _now_str(ts: float) -> str:
     return time.strftime("%Y-%m-%dT%H:%M:%S", time.localtime(ts))
 
 
-def base_doc(task_id: str, instruction: str, now: float) -> dict:
+def base_doc(task_id: str, instruction: str, now: float) -> dict[str, Any]:
     """Doc inicial de uma conversa (1 único por task_id)."""
     return {
         "task_id": task_id,
@@ -47,7 +48,9 @@ def base_doc(task_id: str, instruction: str, now: float) -> dict:
     }
 
 
-def apply_request(doc: dict, nota: str, now: float) -> dict:
+def apply_request(
+    doc: dict[str, Any], nota: str, now: float
+) -> dict[str, Any]:
     """Request novo do usuário: reabre/toca a conversa (nunca cria nova)."""
     doc = dict(doc or {})
     timeline = list(doc.get("timeline") or [])
@@ -77,9 +80,13 @@ def apply_request(doc: dict, nota: str, now: float) -> dict:
     return doc
 
 
-def apply_response(doc: dict, finish_reason: str,
-                   has_tool_calls: bool, now: float,
-                   check_ok: bool | None = None) -> dict:
+def apply_response(
+    doc: dict[str, Any],
+    finish_reason: str,
+    has_tool_calls: bool,
+    now: float,
+    check_ok: bool | None = None,
+) -> dict[str, Any]:
     """Resposta do modelo: atualiza status conforme o finish_reason."""
     doc = dict(doc or {})
     timeline = list(doc.get("timeline") or [])
@@ -128,8 +135,11 @@ def apply_response(doc: dict, finish_reason: str,
     return doc
 
 
-def promote_timeout(doc: dict, now: float,
-                    grace_s: float = GRACE_SILENCE_S) -> dict:
+def promote_timeout(
+    doc: dict[str, Any],
+    now: float,
+    grace_s: float = GRACE_SILENCE_S,
+) -> dict[str, Any]:
     """turn_finished + silêncio >= grace -> completed (sem confirmar nada)."""
     doc = dict(doc or {})
     if doc.get("status") != TURN_FINISHED:

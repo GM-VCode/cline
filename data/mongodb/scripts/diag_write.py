@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """Reproduz a escrita do ProxyRecorder no agent_runs (diagnóstico)."""
 import sys
+from typing import Any
 sys.path.insert(0, ".")
 
 from app.task_store import TaskStore
@@ -9,7 +10,7 @@ store = TaskStore()
 print("store.active:", store.active)
 print("store.error:", store.error)
 
-doc = {
+doc: dict[str, Any] = {
     "task_id": "diag-teste",
     "instruction": "teste de escrita",
     "status": "in_progress",

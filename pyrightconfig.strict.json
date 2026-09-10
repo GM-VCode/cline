@@ -1,0 +1,11 @@
+{
+  "typeCheckingMode": "strict",
+  "venvPath": ".",
+  "venv": ".venv",
+  "include": [
+    "tests"
+  ],
+  "exclude": [
+    "**/__pycache__"
+  ]
+}

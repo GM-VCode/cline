@@ -5,14 +5,16 @@
 # ============================================================
 
 from pymongo import MongoClient
+from pymongo.collection import Collection
 from pymongo.database import Database
+from typing import Any
 
 
 class MongoConnection:
     """Wraper fino a MongoDB: conexión, ping y colecciones."""
 
     def __init__(self, uri: str, db_name: str = "cline_agent",
-                 timeout_ms: int = 2000):
+                 timeout_ms: int = 2000) -> None:
         self.uri = uri
         self.db_name = db_name
         self._client: MongoClient | None = None
@@ -20,7 +22,7 @@ class MongoConnection:
         self.error: str | None = None
         self._connect(timeout_ms)
 
-    def _connect(self, timeout_ms: int):
+    def _connect(self, timeout_ms: int) -> None:
         client = None
         try:
             client = MongoClient(
@@ -44,11 +46,11 @@ class MongoConnection:
         """True si hay conexión válida."""
         return self._client is not None
 
-    def collection(self, name: str):
+    def collection(self, name: str) -> Collection[dict[str, Any]] | None:
         """Acceso a una colección (tasks, validations...)."""
         return self._db[name] if self._db is not None else None
 
-    def close(self):
+    def close(self) -> None:
         """Cierra la conexión si estaba abierta."""
         if self._client is not None:
             try:
