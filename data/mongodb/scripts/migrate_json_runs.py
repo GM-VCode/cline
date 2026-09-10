@@ -4,7 +4,7 @@ import json
 import sys
 sys.path.insert(0, ".")
 
-from app.task_store import TaskStore
+from data.mongodb.store import TaskStore
 
 store = TaskStore()
 with open("data/json/agent_runs.json", encoding="utf-8") as fh:

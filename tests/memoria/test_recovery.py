@@ -16,7 +16,7 @@ from project_path import ProjectPath  # noqa: E402
 ProjectPath.ensure()
 ROOT = ProjectPath.ROOT
 
-from app.task_store import TaskStore          # noqa: E402
+from data.mongodb.store import TaskStore          # noqa: E402
 from data.mongodb.connection import MongoConnection  # noqa: E402
 from data.mongodb.store.json_file import JsonFile   # noqa: E402
 from data.mongodb.store.history import HistoryCollection  # noqa: E402

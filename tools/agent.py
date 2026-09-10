@@ -23,7 +23,7 @@ from app.agent.debug import get_agent_logger  # noqa: E402
 from tools.benchmarks.executor_llama import LlamaExecutor  # noqa: E402
 
 if TYPE_CHECKING:
-    from app.services.task_store import TaskStore
+    from data.mongodb.store import TaskStore
     from tools.logger import AppLogger
 
 

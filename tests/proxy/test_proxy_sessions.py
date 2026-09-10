@@ -15,7 +15,7 @@ ProjectPath.ensure()
 ROOT = ProjectPath.ROOT
 
 from app.services.proxy.sessions import SessionRegistry  # noqa: E402
-from app.task_store import TaskStore  # noqa: E402
+from data.mongodb.store import TaskStore  # noqa: E402
 
 
 class TaskStoreOptions(TypedDict, total=False):

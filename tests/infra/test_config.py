@@ -10,7 +10,7 @@ import shutil
 import tempfile
 import unittest
 
-from app.config import Config
+from project_path import Config
 
 
 class TestResolveModel(unittest.TestCase):

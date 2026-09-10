@@ -29,7 +29,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from project_path import Config, ProjectPath  # noqa: E402
 ProjectPath.ensure()
 
-from app.task_store import TaskStore  # noqa: E402
+from data.mongodb.store import TaskStore  # noqa: E402
 from tools.logger import AppLogger  # noqa: E402
 
 ICONS = {"ok": "✅", "warn": "⚠️ ", "fail": "❌"}

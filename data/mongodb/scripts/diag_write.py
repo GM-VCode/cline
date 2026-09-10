@@ -4,7 +4,7 @@ import sys
 from typing import Any
 sys.path.insert(0, ".")
 
-from app.task_store import TaskStore
+from data.mongodb.store import TaskStore
 
 store = TaskStore()
 print("store.active:", store.active)

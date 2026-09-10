@@ -23,7 +23,7 @@ from app.agent.debug import get_agent_logger  # noqa: E402
 from app.services.proxy import ProxyServer  # noqa: E402
 
 if TYPE_CHECKING:
-    from app.task_store import TaskStore
+    from data.mongodb.store import TaskStore
 
 
 class ProxyCLI:

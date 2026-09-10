@@ -1,0 +1,17 @@
+Centraliza imports: remove pontes de compatibilidade (app/config, app/task_store, app/services/task_store)
+
+Fonte unica de verdade:
+- Config       -> project_path (from project_path import Config)
+- TaskStore    -> data.mongodb.store (from data.mongodb.store import TaskStore)
+- API publica  -> from app import Config, LlamaServer, TaskStore (app/__init__
+                  agora importa direto da fonte; fachada mantida)
+
+Consumidores atualizados (13): test_config (project_path), test_task_store,
+test_recovery, test_proxy_sessions, tools/doctor, tools/validate,
+tools/proxy (type hint), tools/agent (type hint), proxy handler/recorder/
+server (type hints), scripts diag_write e migrate_json_runs
+
+Delete: app/config.py, app/task_store.py, app/services/task_store.py
+(so re-exports; nenhum tinha logica)
+
+Validacao: compileall OK | Pyright 0/0/0 | 154 tests OK | validate.py exit 0

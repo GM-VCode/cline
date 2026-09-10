@@ -18,7 +18,7 @@ from app.services.proxy.runstate import StreamProbe
 from app.services.proxy.sessions import SessionRegistry
 
 if TYPE_CHECKING:  # anotação só para o editor (não roda em runtime)
-    from app.task_store import TaskStore
+    from data.mongodb.store import TaskStore
 
 
 class ProxyHandler(BaseHTTPRequestHandler):

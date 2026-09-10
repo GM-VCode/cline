@@ -93,7 +93,7 @@ if __name__ == "__main__":
     # Registrar la corrida de validación en el histórico (Mongo local + JSON).
     # Nunca debe romper el flujo si Mongo no está disponible.
     try:
-        from app.task_store import TaskStore
+        from data.mongodb.store import TaskStore
         store = TaskStore()
         store.append_validation({
             "phase": "validate",

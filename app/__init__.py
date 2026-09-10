@@ -10,6 +10,6 @@
 
 from project_path import Config  # noqa: F401
 from app.services.server import LlamaServer  # noqa: F401
-from app.services.task_store import TaskStore  # noqa: F401
+from data.mongodb.store import TaskStore  # noqa: F401
 
 __all__ = ["Config", "LlamaServer", "TaskStore"]
