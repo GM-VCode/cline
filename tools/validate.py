@@ -72,7 +72,23 @@ def main() -> int:
     ):
         return 1
 
-    # 3) Sanity del diff (whitespace / marcadores de conflicto)
+    # 3) Tipagem estática (pyright — meta do projeto: 0 erros/avisos/infos).
+    #    Tolerante: se o pyright não estiver instalado, marca SKIP.
+    import shutil
+    pyright = shutil.which("pyright") or shutil.which("pyright.exe")
+    if pyright:
+        if not step(
+            "Tipagem (pyright)",
+            [pyright, "--project", ROOT],
+            "Pyright acusou diagnóstico; corrija (ou justifique com "
+            "# type: ignore[...] + comentário aprovado).",
+        ):
+            return 1
+    else:
+        print("==> Tipagem (pyright)")
+        print("    [SKIP] pyright não instalado no ambiente")
+
+    # 4) Sanity do diff (whitespace / marcadores de conflito)
     if os.path.isdir(os.path.join(ROOT, ".git")):
         if not step(
             "git diff --check",
