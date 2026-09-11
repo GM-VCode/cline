@@ -132,15 +132,15 @@ voltar ao modo direto (sem registro).
 ## 🏗️ Arquitetura
 
 ```
-                        ┌─────────────────────────────┐
-   suas configs         │     project_path.py         │
+                       ┌─────────────────────────────┐
+   suas configs        │     project_path.py         │
   ┌──────────┐  lê     │  class Config               │
   │  .env    ├────────>│  (defaults + .env)          │
   └──────────┘         └──────────────┬──────────────┘
                                       │ fornece
                                       v
                       ┌───────────────────────────────┐                    ┌─────────────────────┐
-                      │        app/services/server.py         │    executa         │  llama-server.exe   │
+                      │       app/services/server.py  │      executa       │  llama-server.exe   │
                       │  class LlamaServer            ├───────────────────>│  (C:\llama.cpp)     │
                       │  valida · monta args · roda   │                    └──────────┬──────────┘
                       └───────────────▲───────────────┘                                │
@@ -152,7 +152,7 @@ voltar ao modo direto (sem registro).
                                                                                      v
   ┌──────────────┐        API OpenAI-Compatible            ┌────────────────────────────────┐
   │ Cline        │<────────────────────────────────────────┤  http://127.0.0.1:8080/v1      │
-  │ (VS Code)    │      🔧 tool calling · 🖼️ visão         └────────────────────────────────┘
+  │ (VS Code)    │      🔧 tool calling · 🖼️ visão        └────────────────────────────────┘
   └──────────────┘
 ```
 
