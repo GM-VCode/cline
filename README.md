@@ -1,3 +1,43 @@
+# 🌙 LunarIA / Modelo Local v1 — ⛔ PROJETO ENCERRADO (para estudos)
+
+> ⛔ **PROJETO ENCERRADO PARA ESTUDOS.**
+> A **versão 1 atingiu seu limite** técnico e de escopo. Este repositório fica
+> congelado como material de estudo — **não há mais desenvolvimento ativo**.
+
+## 📄 Resumo do projeto
+
+**LunarIA** foi um servidor LLM local (llama.cpp build **Vulkan** para a GPU
+AMD Radeon RX 6800) que expunha uma **API OpenAI-Compatible** em
+`http://127.0.0.1:8080/v1` para o **Cline** (VS Code) usar, com suporte a
+**tool calling** 🔧 e **visão (imagens)** 🖼️ opcional — sem nenhuma nuvem,
+100% na máquina.
+
+O que a v1 entregou:
+
+- 🖥️ **Servidor local** (`main.py` + `app/`) com llama-server, configuração via `.env`
+  (contexto de até 400k tokens, modelo inteiro na VRAM, sampling recomendado).
+- 🔀 **Proxy de memória** (`:8081`) entre o Cline e o llama-server, gravando cada
+  requisição no **MongoDB local** (`cline_agent`: `tasks` + `agent_runs`),
+  com **fallback automático para JSON** em `data/json/`.
+- 🛡️ **LoopGuard** no proxy: detecta requests idênticas consecutivas por sessão e
+  intervém (nudge progressivo + bump de temperatura) antes do modelo travar em loop.
+- 🤖 **Agente real** (`app/agent/`): AgentRunner com loop iterativo de ações
+  (write/edit/run/done), edições cirúrgicas (PatchApplier atômico), run interno
+  (o modelo testa o próprio código) e ProjectContext (o modelo vê o código que edita).
+- 📊 **Benchmark A/B** (clássico vs iterativo) com checks objetivos e suíte de
+  testes em `tests/` (incluindo recuperação de JSON corrompido e queda de Mongo).
+- 🧪 **Gate de qualidade**: `tools/validate.py` com compileall + unittest + pyright.
+
+**Por que encerrou:** a v1 atingiu o limite do que o modelo local + a
+infraestrutura da época conseguiam entregar de forma confiável (loop de
+planagem, qualidade das edições e custo de manutenção dos guard-rails). O
+conhecimento ficou documentado em `docs/relatorios/` — o resto do roadmap
+pertence a uma versão futura, não a esta.
+
+---
+
+# 📚 Documentação original (congelada)
+
 # 🌙 LunarIA — Servidor LLM Local para o Cline
 
 ![Python](https://img.shields.io/badge/Python-3.14-3776AB?logo=python&logoColor=white)
