@@ -446,14 +446,7 @@ taskkill /f /im llama-server.exe
 
 ---
 
-## 🛠️ Problemas comuns
+## 🛠️ PROJETO FUNCIONAL SO PRECISA AJUSTA PARA SUA MAQUINA
+atualmente o projeto esta configurado para setup amd...
 
-| 😰 Sintoma | 🔍 Causa / solução |
-|---|---|
-| `ERROS NA CONFIGURAÇÃO: modelo não encontrado` | `MODEL_PATH` no `.env` aponta para arquivo que não existe |
-| Erro de contexto no Cline | Servidor não está rodando — inicie pelo atalho |
-| Cline não manda imagens 🖼️ | Reabra o VS Code / re-adicione o provider (cache "text-only") |
-| Porta 8080 ocupada | Mude `PORT` no `.env` (e a Base URL no Cline) |
-| Proxy não grava nada no Mongo | Base URL do Cline está em `:8080` (tem que ser `:8081`) **ou** o proxy não está rodando — suba `python tools\proxy.py` |
-| Modelo degradando (pastas com nomes estranhos, código embaralhado, vários terminais) | thinking (`<think>`) ligado trunca tool calls longos — o default já é `REASONING=off`; se mexeu no `.env`, volte para `off` e reinicie |
-| Ver logs detalhados | `logs\proxy_and_server\llama-server.err.log` (e `logs\app\` para os logs do projeto) |
+
