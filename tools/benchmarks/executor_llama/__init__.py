@@ -48,11 +48,21 @@ class LlamaExecutor(ModelExecutor):
         self.last_parsed: JsonObject | None = None
         self.parser = ExecutorResponseParser()
 
-    def _build_messages(self, instruction: str,
+    def _build_messages(self, instruction: str, project_dir: str,
                         feedback: str | None = None) -> list[JsonObject]:
+        # contexto do projeto: o modelo PRECISA ver o código que existe
+        # (mesma visão do AgentRunner) — editar no chute era a causa de
+        # respostas longas/erradas nas tarefas de editar/refatorar.
+        conteudo = instruction
+        try:
+            from app.agent.context import ProjectContext
+            conteudo = (instruction + "\n\n"
+                        + ProjectContext(project_dir).to_prompt())
+        except Exception:  # contexto é melhor-effort; nunca quebra o executor
+            pass
         messages: list[JsonObject] = [
             {"role": "system", "content": SYSTEM},
-            {"role": "user", "content": instruction},
+            {"role": "user", "content": conteudo},
         ]
         if feedback:
             messages.extend([
@@ -63,9 +73,9 @@ class LlamaExecutor(ModelExecutor):
 
     def _request(self, instruction: str, project_dir: str,
                  feedback: str | None = None) -> JsonObject:
-        _ = project_dir
         payload: JsonObject = {
-            "model": "LunarIA", "messages": self._build_messages(instruction, feedback),
+            "model": "LunarIA", "messages": self._build_messages(
+                instruction, project_dir, feedback),
             "temperature": self.retry_temperature if feedback else self.temperature,
             "max_tokens": self.max_tokens,
             "chat_template_kwargs": {"enable_thinking": self.enable_thinking},
