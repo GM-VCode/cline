@@ -91,7 +91,12 @@ def main() -> int:
     # `--real` mede o modelo de verdade (chama /v1); senão usa LocalExecutor
     use_real = args.real
     executor = (LlamaExecutor() if use_real else LocalExecutor())
+    # projetos de debug de cada tarefa ficam em <repo>/temp/bench_<id>
+    # (aparecem lá para inspeção; apagados/recriados a cada corrida)
+    work_root = ProjectPath.join("temp")
+    os.makedirs(work_root, exist_ok=True)
     runner = BenchmarkRunner(executor, default_catalog(),
+                             work_root=work_root,
                              max_attempts=args.attempts,
                              max_actions=args.max_actions)
     results = runner.run_all()

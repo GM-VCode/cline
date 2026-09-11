@@ -101,8 +101,13 @@ if __name__ == "__main__":
             "exit_code": rc,
         })
         store.close()
-    except Exception:
-        pass
+    except Exception as exc:
+        try:
+            from tools.logger import AppLogger
+            AppLogger("validate").warn(
+                f"validate: corrida não registrada no histórico: {exc}")
+        except Exception:  # pragma: no cover — logging nunca quebra o gate
+            pass
     # Log a logs/app.log (capa de logging centralizada del proyecto)
     try:
         from tools.logger import AppLogger

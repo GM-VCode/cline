@@ -119,8 +119,10 @@ class ProxyHandler(BaseHTTPRequestHandler):
                 if probe is not None:
                     try:
                         probe.feed(chunk)
-                    except Exception:  # nunca deixa o probe quebrar o fluxo
-                        pass
+                    except Exception as exc:  # fail-open: nunca quebra o fluxo
+                        log = get_agent_logger()
+                        if log:
+                            log.debug(f"probe.feed ignorado: {exc}")
                 self.wfile.write(chunk)
                 self.wfile.flush()
         finally:

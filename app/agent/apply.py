@@ -16,6 +16,17 @@ import os
 from typing import Any, cast
 
 
+def _agent_log(level: str, msg: str) -> None:
+    """Loga em logs/app/agent.log (import lazy, nunca levanta)."""
+    try:
+        from app.agent.debug import get_agent_logger
+        log = get_agent_logger()
+        if log:
+            log.log(level, msg)
+    except Exception:  # pragma: no cover — logging nunca quebra o applier
+        pass
+
+
 class PatchApplier:
     """Aplica edições de trecho em arquivos de projeto, com atomicidade."""
 
@@ -58,6 +69,7 @@ class PatchApplier:
             )
 
             if isinstance(plan, str):
+                _agent_log("WARN", f"edit REJEITADO: {plan}")
                 return False, [plan]
 
             plans.append(plan)
@@ -93,6 +105,8 @@ class PatchApplier:
             report.append(
                 f"editado: {os.path.relpath(path, project_dir)}"
             )
+            _agent_log("DEBUG",
+                       f"edit aplicado: {os.path.relpath(path, project_dir)}")
 
         return True, report
 

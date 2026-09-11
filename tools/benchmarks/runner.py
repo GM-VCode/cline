@@ -7,12 +7,14 @@
 #                           temporário, mede métricas e valida checks
 # ============================================================
 
+import json
 import os
 import shutil
 import tempfile
 import time
 from typing import Any, TYPE_CHECKING
 
+from app.agent.debug import get_benchmark_logger
 from tools.benchmarks.seeds import BenchmarkProjectSeeder
 from tools.benchmarks.tasks.core import BenchmarkTask, CheckResult
 
@@ -77,10 +79,51 @@ class BenchmarkRunner:
         os.makedirs(project_dir, exist_ok=True)
         return project_dir
 
+    def _dump_debug(self, project_dir: str, executor: ModelExecutor,
+                    task_id: str, checks: list[CheckResult]) -> None:
+        """Deixa o debug VISÍVEL na pasta da tarefa.
+
+        _debug_resposta.json: TODAS as respostas brutas (1 por tentativa)
+        + a resposta interpretada (files/edits/run) + erros de edição —
+        cada falha do modelo fica visível, não só a última.
+        _debug_checks.txt: veredito de cada check.
+        Nunca levanta — debug não pode quebrar o run.
+        """
+        try:
+            raws = getattr(executor, "raw_history", None) or []
+            last = getattr(executor, "last_raw", None)
+            brutas = raws if (raws or last is None) else [last]
+            dump: dict[str, Any] = {
+                "task": task_id,
+                "tentativas": len(brutas),
+                "respostas_brutas": brutas,
+            }
+            parsed = getattr(executor, "last_parsed", None)
+            if parsed is not None:
+                dump["resposta_interpretada"] = parsed
+            path = os.path.join(project_dir, "_debug_resposta.json")
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(dump, f, ensure_ascii=False, indent=2,
+                          default=str)
+            lines = [f"{n}: {'OK' if ok else 'FAIL'} — {m}"
+                     for n, ok, m in checks]
+            path = os.path.join(project_dir, "_debug_checks.txt")
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(f"task: {task_id}\n" + "\n".join(lines) + "\n")
+        except OSError as exc:  # pragma: no cover — debug não quebra o run
+            if log := get_benchmark_logger():
+                log.warn(f"debug dump falhou em {project_dir}: {exc}")
+
     def run_task(self, task: BenchmarkTask) -> dict[str, Any]:
         """Executa uma tarefa e retorna métricas + resultado dos checks."""
         project_dir = self._fresh_project(task.task_id)
         self.seeder.seed(task, project_dir)
+        log = get_benchmark_logger()
+        if log:
+            log.info(f"TASK {task.task_id} [{task.category}] "
+                     f"instruction={task.instruction[:80]!r} "
+                     f"project_dir={project_dir}")
+            log.debug(f"BEGIN {task.task_id}")
 
         started = time.time()
         retries = 0
@@ -135,7 +178,7 @@ class BenchmarkRunner:
             passed = sum(1 for _, ok, _ in checks if ok)
             finished = error is None and passed == len(checks)
             files_changed = self._count_files(project_dir)
-            return {
+            result = {
                 "task_id": task.task_id,
                 "category": task.category,
                 "finished": finished,
@@ -150,6 +193,15 @@ class BenchmarkRunner:
                 "tokens": (response or {}).get("tokens", 0),
                 "project_dir": project_dir,
             }
+            self._dump_debug(project_dir, self.executor, task.task_id,
+                             checks)
+            if log:
+                log.info(f"RESULT {task.task_id} finished={result['finished']} "
+                         f"checks={result['checks_passed']}/"
+                         f"{result['checks_total']} retries={retries} "
+                         f"elapsed_s={result['elapsed_s']} "
+                         f"executor_error={result['executor_error']!r}")
+            return result
 
         # modo iterativo (11c)
         elapsed = round(time.time() - started, 2)
@@ -157,7 +209,7 @@ class BenchmarkRunner:
         # métrica do benchmark = checks; 'finished' do loop é secundário
         # (orçamento estourado com checks verdes continua sendo acerto)
         finished = passed == len(checks)
-        return {
+        result = {
             "task_id": task.task_id,
             "category": task.category,
             "finished": finished,
@@ -173,6 +225,14 @@ class BenchmarkRunner:
             "tokens": (response or {}).get("tokens", 0),
             "project_dir": project_dir,
         }
+        self._dump_debug(project_dir, self.executor, task.task_id, checks)
+        if log:
+            log.info(f"RESULT {task.task_id} finished={result['finished']} "
+                     f"checks={result['checks_passed']}/"
+                     f"{result['checks_total']} retries=0 "
+                     f"elapsed_s={result['elapsed_s']} "
+                     f"executor_error={result['executor_error']!r}")
+        return result
 
     @staticmethod
     def _format_feedback(checks: list[CheckResult]) -> str:

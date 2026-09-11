@@ -60,7 +60,8 @@ class MemoryCli:
         return 0
 
     def _agent_runs(self, limit: int) -> int:
-        runs = self.store.list_agent_runs(limit=limit)
+        # "*" = todas as execuções (qualquer task_id), mais recente primeiro
+        runs = self.store.list_agent_runs(limit=limit, task_id="*")
         if not runs:
             print("Nenhuma execução do agente registrada ainda (rode tools/agent.py).")
             return 0
@@ -116,6 +117,10 @@ class MemoryCli:
 def main() -> int:
     uri = os.environ.get("MONGODB_URI", "") or "mongodb://localhost:27017/"
     store = TaskStore(uri=uri)
+    if not store.active:
+        motivo = store.error or "desconhecido"
+        print(f"AVISO: MongoDB indisponível ({motivo}) — lendo do fallback "
+              f"JSON ({store.paths.validations_path})")
     rc = MemoryCli(store).run(sys.argv[1:])
     store.close()
     return rc

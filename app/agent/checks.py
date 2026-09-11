@@ -6,12 +6,24 @@
 
 import subprocess
 
+from app.agent.debug import get_agent_logger
+
 
 class CheckRunner:
     """Roda um comando de validação dentro do diretório do projeto."""
 
     def __init__(self, timeout: int = 120) -> None:
         self.timeout = timeout
+
+    @staticmethod
+    def _log(level: str, msg: str) -> None:
+        """Loga em logs/app/agent.log (import lazy, nunca levanta)."""
+        try:
+            log = get_agent_logger()
+            if log:
+                log.log(level, msg)
+        except Exception:  # pragma: no cover — logging nunca quebra o check
+            pass
 
     def run(self, check_cmd: list[str], project_dir: str) -> tuple[bool, str]:
         """Retorna (ok: bool, output: str). Nunca lança."""
@@ -23,8 +35,12 @@ class CheckRunner:
             cleaned = output.strip()
             if proc.returncode != 0 and not cleaned:
                 cleaned = f"check exited with code {proc.returncode}"
+            if proc.returncode != 0:
+                self._log("WARN", f"check FALHOU exit {proc.returncode} "
+                                  f"cmd={check_cmd}: {cleaned[:300]}")
             return proc.returncode == 0, cleaned
         except (OSError, subprocess.TimeoutExpired, ValueError) as exc:
+            self._log("ERROR", f"check não executou ({check_cmd}): {exc}")
             return False, f"erro ao executar check: {exc}"
 
     def run_shell(self, cmd: str, project_dir: str) -> tuple[bool, str]:
@@ -39,6 +55,7 @@ class CheckRunner:
                 cleaned = f"run exited with code {proc.returncode}"
             return proc.returncode == 0, cleaned
         except (OSError, subprocess.TimeoutExpired, ValueError) as exc:
+            self._log("WARN", f"run shell não executou ({cmd[:120]!r}): {exc}")
             return False, f"erro ao executar run: {exc}"
 
     @staticmethod

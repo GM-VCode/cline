@@ -8,6 +8,8 @@
 import os
 from typing import Iterator
 
+from app.agent.debug import get_agent_logger
+
 SKIP_DIRS = {".git", "node_modules", ".venv", "__pycache__",
              "dist", "build", ".idea", ".vscode"}
 MAX_FILE_BYTES = 8 * 1024        # conteúdo por arquivo
@@ -47,7 +49,8 @@ class ProjectContext:
             tree.append(rel)
             try:
                 size = os.path.getsize(path)
-            except OSError:
+            except OSError as exc:
+                self._log("WARN", f"contexto: getsize falhou em {rel}: {exc}")
                 continue
             if (len(details) < self.max_files
                     and budget + size <= self.max_total
@@ -58,9 +61,21 @@ class ProjectContext:
                         body = f.read()
                     details.append(f"--- {rel} ---\n{body}")
                     budget += min(size, len(body.encode("utf-8")))
-                except OSError:
+                except OSError as exc:
+                    self._log("WARN", f"contexto: leitura falhou em {rel}: "
+                                      f"{exc}")
                     continue
         return tree, details, budget
+
+    @staticmethod
+    def _log(level: str, msg: str) -> None:
+        """Loga em logs/app/agent.log (import lazy, nunca levanta)."""
+        try:
+            log = get_agent_logger()
+            if log:
+                log.log(level, msg)
+        except Exception:  # pragma: no cover — logging nunca quebra contexto
+            pass
 
     def to_prompt(self) -> str:
         if not self.tree:

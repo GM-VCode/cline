@@ -21,6 +21,17 @@ from project_path import Config  # noqa: E402
 from tools.cline_use.grader import Grader  # noqa: E402
 from tools.cline_use.tasks import TASKS, ClineUseTask  # noqa: E402
 
+
+def _log(level: str, msg: str) -> None:
+    """Loga em logs/model/cline-use.log (import lazy, nunca levanta)."""
+    try:
+        from app.agent.debug import get_cline_use_logger
+        log = get_cline_use_logger()
+        if log:
+            log.log(level, msg)
+    except Exception:  # pragma: no cover — logging nunca quebra o bench
+        pass
+
 SYSTEM = (
     "Voce e um agente de codigo que usa as ferramentas do Cline "
     "(write de arquivos). Responda APENAS com JSON valido, sem markdown:\n"
@@ -72,6 +83,8 @@ def run_task(task: ClineUseTask, url: str, retries: int) -> tuple[
                 ultimo_erro = str(exc)[:300]
                 results = []
                 print(f"  [tentativa {attempt}] resposta invalida: {ultimo_erro}")
+                _log("ERROR", f"run {task.id} tentativa {attempt} falhou: "
+                              f"{ultimo_erro}")
                 continue
             files = {p: c for p, c in resposta.get("files", {}).items()
                      if isinstance(p, str) and isinstance(c, str)}
@@ -141,6 +154,7 @@ def main() -> int:
             tid, results, _, tent = run_task(task, args.url, args.retries)
         except Exception as exc:  # noqa: BLE001 — relatório não deve abortar
             saida.print(f"ERRO: {exc}")
+            _log("ERROR", f"run {task.id} estourou exceção: {exc}")
             continue
         saida.print(f" tentativas usadas: {tent}/{args.retries}")
         for nome, ok, detalhe in results:
@@ -151,6 +165,9 @@ def main() -> int:
     saida.print(f"\nPONTUACAO: {total_ok}/{total} checks "
                 f"({100 * total_ok // max(total, 1)}%)")
     saida.close()
+    _log("INFO" if total_ok == total else "WARN",
+         f"corrida cline_use: {total_ok}/{total} checks "
+         f"(log da corrida: {log_path})")
     print(f"\nLog da corrida: {log_path}")
     return 0 if total_ok == total else 1
 

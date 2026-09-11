@@ -11,6 +11,17 @@ import subprocess
 import sys
 
 
+def _log(level: str, msg: str) -> None:
+    """Loga em logs/model/cline-use.log (import lazy, nunca levanta)."""
+    try:
+        from app.agent.debug import get_cline_use_logger
+        log = get_cline_use_logger()
+        if log:
+            log.log(level, msg)
+    except Exception:  # pragma: no cover — logging nunca quebra o grader
+        pass
+
+
 def full_content(path: str) -> str:
     """Lê o arquivo preservando comparação exata com o seed."""
     with open(path, encoding="utf-8") as f:
@@ -35,6 +46,9 @@ class Grader:
         results.append(self._check_tips(task.require_typed_init))
         results.append(self._check_untouched(task.require_untouched, task.seed_files))
         results.append(self._check_run(task.verify_cmd))
+        for nome, ok, detalhe in results:
+            if not ok:
+                _log("WARN", f"grade {task.id} FAIL {nome}: {detalhe}")
         return results
 
     # --- checks individuais -------------------------------------------

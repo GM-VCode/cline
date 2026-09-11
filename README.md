@@ -52,7 +52,7 @@ Cline (VS Code) → proxy (:8081) → llama-server (:8080)
 
 | Porta | Processo | Como sobe |
 |---|---|---|
-| `:8080` | **llama-server** (o modelo) | Sobe junto com a stack completa (`INICIAR-LunarIA.bat` / atalho da Área de Trabalho) — roda sem janela, log em `logs\llama-server.out.log` |
+| `:8080` | **llama-server** (o modelo) | Sobe junto com a stack completa (`INICIAR-LunarIA.bat` / atalho da Área de Trabalho) — roda sem janela, log em `logs\proxy_and_server\llama-server.out.log` |
 | `:8081` | **proxy de memória** | Sobe automaticamente com a stack completa (ou sozinho: `python tools\proxy.py`) |
 
 > ⚠️ O bat **não** sobe o proxy — são duas janelas: a do bat (modelo) e a do cmd (proxy).
@@ -74,12 +74,14 @@ cai para JSON em `data\json\`.
 
 ### ✅ Como conferir se gravou
 
-⚠️ O proxy grava com `task_id` = **ID da sessão do Cline** (não `current`),
-então `memory.py agent-runs` (que filtra por `current`) **não lista** os
-registros do proxy. Consulte o Mongo direto, sem filtro:
+O proxy grava com `task_id` = **ID da sessão do Cline** (não `current`).
+Use o `memory.py` — ele agora lista **todas** as execuções (mais recente
+primeiro), independentemente do task_id:
 
 ```bash
-.venv\Scripts\python.exe -c "import pymongo; db = pymongo.MongoClient('mongodb://localhost:27017')['cline_agent']; [print(d) for d in db.agent_runs.find({}, {'_id': 0, 'source': 1, 'instruction': 1}).sort('_id', -1).limit(5)]"
+.venv\Scripts\python.exe data\mongodb\scripts\memory.py agent-runs
+.venv\Scripts\python.exe data\mongodb\scripts\memory.py diagnostics
+.venv\Scripts\python.exe data\mongodb\scripts\memory.py validations
 ```
 
 Feche o proxy e volte a Base URL para `http://127.0.0.1:8080/v1` para
@@ -149,7 +151,15 @@ LunarIA/
 │   ├── test_config.py · test_server.py · test_task_store.py · test_doctor.py
 │
 ├── 📂 logs/                      ← logs centralizados (.log ignorados)
-│   └── .gitkeep                  ← mantém a carpeta rastreada
+│   ├── app/                     ← níveis (debug/info/warn/error/critical.log)
+│   │                               + agent.log (agente) + fallback.log (memória)
+│   ├── model/                   ← benchmark.log · executor.log · cline-use.log
+│   │                               · corridas <MODELO>_<ts>.log
+│   └── proxy_and_server/        ← llama-server.out/err · stack_proxy/server.log
+│
+├── 🧪 temp/                      ← debug do benchmark/agente (NÃO vai pro git)
+│   └── bench_<task_id>/         ← código gerado + _debug_resposta.json +
+│                                   _debug_checks.txt (gerado a cada corrida)
 │
 ├── 🖥️ bat/                       ← scripts de inicialização (ver bat/README.md)
 │   ├── INICIAR-STACK-COMPLETA.bat     → ⭐ sobe modelo + proxy (1 clique)
@@ -184,6 +194,46 @@ LunarIA/
 ```
 
 > 📂 Cada pasta tem seu próprio `README.md` explicando o que guarda e como usar.
+
+---
+
+## 🛠️ Ferramentas (todas via venv, da raiz do projeto)
+
+```bash
+# GATE de validação (compileall + unittest + git diff) — OBRIGATÓRIO antes
+# de declarar qualquer tarefa concluída; registra cada corrida no Mongo:
+.venv\Scripts\python.exe tools\validate.py
+
+# Diagnóstico do ambiente (paths, config, logs, Mongo, API) — grava em
+# diagnostics (Mongo) e loga em logs/app/info.log:
+.venv\Scripts\python.exe tools\doctor.py
+
+# Benchmark do agente (11 tarefas; verifica de verdade). --real usa o
+# modelo no ar (:8080); os debugs ficam em temp\bench_<task_id>\ —
+# _debug_resposta.json (todas as respostas do modelo) e _debug_checks.txt:
+.venv\Scripts\python.exe tools\benchmarks\run.py --real
+
+# Teste ponta a ponta do agente: 1 tarefa, verificação real, e registro
+# em tasks + agent_runs (finished True/False confirmado lendo do banco):
+.venv\Scripts\python.exe tools\agent_test.py
+
+# Memória (consulta o Mongo cline_agent; fallback JSON automático):
+.venv\Scripts\python.exe data\mongodb\scripts\memory.py state
+.venv\Scripts\python.exe data\mongodb\scripts\memory.py agent-runs
+.venv\Scripts\python.exe data\mongodb\scripts\memory.py diagnostics
+.venv\Scripts\python.exe data\mongodb\scripts\memory.py validations
+
+# Proxy de memória sozinho (default :8081 -> :8080):
+.venv\Scripts\python.exe tools\proxy.py
+```
+
+Logs: tudo em `logs\` organizado por domínio — `logs\app\` (níveis +
+agent.log + fallback.log), `logs\model\` (benchmark/executor/cline-use),
+`logs\proxy_and_server\` (llama-server, stack). Quando o MongoDB está
+fora do ar, cada fallback ativado fica registrado em `logs\app\fallback.log`.
+
+Relatórios de sessão: `docs\relatorios\` (04 = arquitetura do agente,
+05 = loop-guard do proxy, 07 = cobertura de logging, 08 = fase 2).
 
 ---
 
@@ -366,4 +416,4 @@ taskkill /f /im llama-server.exe
 | Porta 8080 ocupada | Mude `PORT` no `.env` (e a Base URL no Cline) |
 | Proxy não grava nada no Mongo | Base URL do Cline está em `:8080` (tem que ser `:8081`) **ou** o proxy não está rodando — suba `python tools\proxy.py` |
 | Modelo degradando (pastas com nomes estranhos, código embaralhado, vários terminais) | thinking (`<think>`) ligado trunca tool calls longos — o default já é `REASONING=off`; se mexeu no `.env`, volte para `off` e reinicie |
-| Ver logs detalhados | `C:\llama.cpp\server.err.log` |
+| Ver logs detalhados | `logs\proxy_and_server\llama-server.err.log` (e `logs\app\` para os logs do projeto) |

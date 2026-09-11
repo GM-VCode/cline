@@ -91,6 +91,11 @@ class LlamaServer:
             print("Encerrando llama-server...")
             self.log.info("encerrando llama-server (CTRL+C)")
             process.terminate()
+        code = process.poll()
+        if code not in (0, None):
+            print(f"llama-server TERMINOU com exit {code}")
+            self.log.error(f"llama-server terminou inesperadamente "
+                           f"com exit {code} (ver {self.cfg.LOG_ERR})")
 
     def _report_health_failure(self, process: subprocess.Popen) -> None:
         print("FALHOU — veja as últimas linhas de " + self.cfg.LOG_ERR)

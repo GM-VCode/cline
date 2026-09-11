@@ -117,6 +117,10 @@ class AgentRunner:
                         prompt, project_dir, feedback)
                     retries += 1
             except Exception as exc:
+                # loga o motivo real: o executor estourar nunca passa calado.
+                if log:
+                    log.error(f"executor estourou exceção no attempt "
+                              f"{attempt}: {exc}")
                 return {"finished": False, "error": str(exc),
                         "attempts": attempts, "retries": retries,
                         "elapsed_s": round(time.time() - started, 2)}

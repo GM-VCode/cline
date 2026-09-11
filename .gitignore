@@ -17,6 +17,10 @@ server_runner*.log
 anotacao.txt
 _tmp*
 tmp/
+# temp/ do projeto: artefatos de debug do benchmark/agente — gerados a cada
+# corrida (benchmark --real, agent_test) e NUNCA vão pro git; só .gitkeep
+temp/*
+!temp/.gitkeep
 # _*  (retirado: coincidía con data/mongodb/__init__.py y lo ignoraba)
 #    Usar _*.tmp si se necesita ignorar temporales con guión bajo
 *.env

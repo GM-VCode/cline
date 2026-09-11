@@ -47,7 +47,7 @@ for ($i = 0; $i -lt 60; $i++) {
 }
 if (-not $ok) {
   Write-Host "FALHOU: modelo nao subiu em $healthUrl"
-  if (Test-Path (Join-Path $dir 'logs\stack_server.err.log')) { Get-Content (Join-Path $dir 'logs\stack_server.err.log') -Tail 15 }
+  if (Test-Path (Join-Path $dir 'logs\proxy_and_server\stack_server.err.log')) { Get-Content (Join-Path $dir 'logs\proxy_and_server\stack_server.err.log') -Tail 15 }
   Read-Host 'Pressione ENTER para fechar'; exit 1
 }
 Write-Host "   MODELO PRONTO: http://${hostAddr}:${port}/v1"
@@ -72,6 +72,6 @@ Write-Host "== 4/4 Status"
 if ($proxyOk) {
   Write-Host "STACK PRONTA: modelo ${hostAddr}:${port} + proxy :8081 -> aponte o Cline para http://127.0.0.1:8081/v1"
 } else {
-  Write-Host "AVISO: modelo OK, mas proxy nao respondeu em :8081 (veja logs\stack_proxy.err.log)"
+  Write-Host "AVISO: modelo OK, mas proxy nao respondeu em :8081 (veja logs\proxy_and_server\stack_proxy.err.log)"
 }
 Read-Host 'Pressione ENTER para fechar'

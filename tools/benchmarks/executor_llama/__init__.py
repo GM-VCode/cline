@@ -2,7 +2,7 @@ import json
 import urllib.request
 from typing import Any, cast
 
-from app.agent.debug import get_agent_logger
+from app.agent.debug import get_agent_logger, get_executor_logger
 from tools.benchmarks.runner import ModelExecutor
 from tools.benchmarks.executor_llama.parser import ExecutorResponseParser
 
@@ -42,6 +42,10 @@ class LlamaExecutor(ModelExecutor):
         self.enable_thinking = enable_thinking
         self.retry_temperature = retry_temperature
         self.last_raw: JsonObject | None = None
+        #: histórico de TODAS as respostas brutas (1 por tentativa) —
+        #: usado pelo _dump_debug do BenchmarkRunner p/ falhas visíveis
+        self.raw_history: list[JsonObject] = []
+        self.last_parsed: JsonObject | None = None
         self.parser = ExecutorResponseParser()
 
     def _build_messages(self, instruction: str,
@@ -109,8 +113,17 @@ class LlamaExecutor(ModelExecutor):
         log = get_agent_logger()
         if log:
             log.debug(f"REQUEST instr={len(instruction)}ch feedback={'sim' if feedback else 'nao'}")
+        elog = get_executor_logger()
+        if elog:
+            elog.debug(f"EXECUTOR CALL instr={len(instruction)}ch "
+                       f"feedback={'sim' if feedback else 'nao'} "
+                       f"project_dir={project_dir}")
         response = self._request(instruction, project_dir, feedback=feedback)
         self.last_raw = response
+        self.raw_history.append(response)
+        if elog:
+            raw = str(response)
+            elog.debug(f"RESPONSE RAW ({len(raw)}ch): {raw[:2000]}")
         content = self.parser.extract_content(response)
         files, edits, run_cmd, action = self._parse_files(content)
         edit_report: list[Any] = []
@@ -120,10 +133,12 @@ class LlamaExecutor(ModelExecutor):
                 from app.agent.apply import PatchApplier
                 ok, edit_report = PatchApplier().apply(project_dir, edits)
                 if not ok:
-                    return {"tool_calls": 0, "retries": 0, "tokens": 0,
-                            "files_written": [], "files": {}, "edits_failed": True,
-                            "edit_errors": edit_report, "run": None,
-                            "content_preview": content[:120]}
+                    result = {"tool_calls": 0, "retries": 0, "tokens": 0,
+                              "files_written": [], "files": {}, "edits_failed": True,
+                              "edit_errors": edit_report, "run": None,
+                              "content_preview": content[:120]}
+                    self.last_parsed = result
+                    return result
         else:
             edit_report = [f"pendente: {len(edits)} edit(s)"]
         usage_value: object = response.get("usage", {})
@@ -132,13 +147,15 @@ class LlamaExecutor(ModelExecutor):
             if isinstance(usage_value, dict)
             else {}
         )
-        return {
+        result = {
             "tool_calls": len(files) + len(edits), "retries": 0,
             "tokens": usage.get("total_tokens", 0),
             "files_written": sorted(files.keys()), "files": files, "edits": edits,
             "edits_applied": edit_report, "run": run_cmd, "action": action,
             "content_preview": content[:120],
         }
+        self.last_parsed = result
+        return result
 
 
 __all__ = ["LlamaExecutor", "DEFAULT_URL", "SYSTEM"]

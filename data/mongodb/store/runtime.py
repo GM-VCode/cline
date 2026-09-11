@@ -35,25 +35,11 @@ class RuntimePaths:
 
     @staticmethod
     def _load_env() -> dict[str, str]:
-        try:
-            values: dict[str, str] = {}
-            with open(
-                os.path.join(RuntimePaths._project_root(), ".env"),
-                encoding="utf-8",
-            ) as env_file:
-                for line in env_file:
-                    line = line.strip()
-                    if not line or line.startswith("#") or "=" not in line:
-                        continue
-                    key, value = line.split("=", 1)
-                    key = key.strip()
-                    value = value.strip()
-                    if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
-                        value = value[1:-1]
-                    values[key] = value
-            return values
-        except Exception:
-            return {}
+        # reusa o loader central (mesma tolerância, MESMO log de falha
+        # em logs/app: .env ilegível nunca passa mais em silêncio)
+        from project_path.dotenv import load_dotenv
+        return load_dotenv(
+            os.path.join(RuntimePaths._project_root(), ".env"))
 
     def _setting(self, key: str) -> str:
         return self.env.get(key, "") or os.environ.get(key, "")

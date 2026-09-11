@@ -49,6 +49,7 @@ class TaskStore:
         )
         self._error: str | None = None
         self._error = self._conn.error
+        self._log_fallback()
 
         self.state = StateRepo(
             self._conn, self.paths.state_path, self.task_id,
@@ -68,6 +69,27 @@ class TaskStore:
 
     def _catch_error(self, msg: str) -> None:
         self._error = msg
+        self._log_fallback(extra=f"erro em runtime: {msg}")
+
+    def _log_fallback(self, extra: str | None = None) -> None:
+        """Registra em logs/app/fallback.log quando o MongoDB não está
+        disponível e o fallback JSON/temp entra em ação (auditoria).
+        Import lazy: nunca deixa o logging quebrar o store.
+        """
+        if self._conn and self._conn.active:
+            return
+        try:
+            from app.agent.debug import get_fallback_logger
+            log = get_fallback_logger()
+            if log:
+                motivo = self._error or "desconhecido"
+                destino = self.paths.state_path
+                log.warn(f"FALLBACK ATIVADO Mongo indisponível "
+                         f"(motivo: {motivo}) → JSON/temp: {destino}")
+                if extra:
+                    log.warn(f"FALLBACK {extra}")
+        except Exception:  # pragma: no cover - logging nunca quebra o store
+            pass
 
     @property
     def active(self) -> bool:

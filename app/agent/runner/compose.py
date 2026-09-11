@@ -30,4 +30,18 @@ class PromptComposer:
         if self.use_context:
             parts.append(ProjectContext(project_dir).to_prompt())
         parts.append(f"INSTRUÇÃO: {instruction}")
-        return "\n\n".join(parts)
+        prompt = "\n\n".join(parts)
+        self._log_size(instruction, len(prompt))
+        return prompt
+
+    @staticmethod
+    def _log_size(instruction: str, prompt_len: int) -> None:
+        """DEBUG do tamanho do prompt em logs/app/agent.log (nunca levanta)."""
+        try:
+            from app.agent.debug import get_agent_logger
+            log = get_agent_logger()
+            if log:
+                log.debug(f"prompt composto: {prompt_len}ch "
+                          f"(instrução={len(instruction)}ch)")
+        except Exception:  # pragma: no cover — logging nunca quebra o compose
+            pass

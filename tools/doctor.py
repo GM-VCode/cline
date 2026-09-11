@@ -141,6 +141,8 @@ class ModelDoctor:
                 status, msg = fn()
             except Exception as exc:  # pragma: no cover
                 status, msg = "fail", f"exceção: {exc}"
+                self.log.error(f"check {getattr(fn, '__name__', fn)!r} "
+                               f"estourou exceção: {exc}")
             fails += status == "fail"
             warns += status == "warn"
             if verbose:

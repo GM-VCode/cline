@@ -36,5 +36,9 @@ class BenchmarkTask:
                 ok, msg = fn(project_dir)
             except Exception as exc:  # pragma: no cover
                 ok, msg = False, f"exceção no check {name}: {exc}"
+                from app.agent.debug import get_benchmark_logger
+                blog = get_benchmark_logger()
+                if blog:
+                    blog.error(f"check {name!r} estourou exceção: {exc}")
             out.append((name, ok, msg))
         return out

@@ -40,6 +40,17 @@ class MongoConnection:
                 except Exception:
                     pass
             self.error = f"Mongo indisponible: {exc}"
+            self._log_failure(exc)
+
+    def _log_failure(self, exc: Exception) -> None:
+        """Loga a falha de conexão (import lazy, nunca levanta)."""
+        try:
+            from app.agent.debug import get_fallback_logger
+            log = get_fallback_logger()
+            if log:
+                log.error(f"MongoConnection falhou em {self.uri}: {exc}")
+        except Exception:  # pragma: no cover — logging nunca quebra a conexão
+            pass
 
     @property
     def active(self) -> bool:

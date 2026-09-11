@@ -76,6 +76,20 @@ class Config:
                                          "llama-server.err.log")
         self.APP_LOG: str = os.path.join(self.LOG_DIR, "app", "app.log")
         self.AGENT_LOG: str = os.path.join(self.LOG_DIR, "app", "agent.log")
+        # logs/model → benchmark (TASK/BEGIN/RESULT) e executor
+        # (REQUEST/RESPONSE bruto do LlamaExecutor)
+        self.BENCHMARK_LOG: str = os.path.join(self.LOG_DIR, "model",
+                                               "benchmark.log")
+        self.EXECUTOR_LOG: str = os.path.join(self.LOG_DIR, "model",
+                                              "executor.log")
+        # fallback de memória (Mongo indisponível → JSON/temp): loga
+        # SEMPRE que o fallback for ativado, para auditoria.
+        self.FALLBACK_LOG: str = os.path.join(self.LOG_DIR, "app",
+                                              "fallback.log")
+        # chat-bench do Cline (tools/cline_use): falhas e resumo da
+        # corrida, separado do Tee por-corrida (<MODELO>_<ts>.log).
+        self.CLINE_USE_LOG: str = os.path.join(self.LOG_DIR, "model",
+                                               "cline-use.log")
 
         # Binario do llama.cpp (global, fora do repo)
         self.LLAMA_SERVER: str = r"C:\llama.cpp\llama-server.exe"

@@ -55,8 +55,12 @@ class BenchmarkReport:
             return summary
         try:
             self.store.append_benchmark(summary)
-        except Exception:  # pragma: no cover
-            pass
+        except Exception as exc:  # pragma: no cover — persistência nunca
+            # deve derrubar o relatório, mas a falha FICA registrada.
+            from app.agent.debug import get_benchmark_logger
+            log = get_benchmark_logger()
+            if log:
+                log.error(f"falha ao salvar resumo do benchmark: {exc}")
         return summary
 
     @staticmethod

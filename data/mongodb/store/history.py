@@ -159,7 +159,9 @@ class HistoryCollection:
         coll = self._coll
         if coll is not None:
             try:
-                cursor: Iterable[Document] = (coll.find({"task_id": tid})
+                filtro: dict[str, Any] = ({} if tid == "*"
+                                          else {"task_id": tid})
+                cursor: Iterable[Document] = (coll.find(filtro)
                                               .sort("_id", -1).limit(limit))
                 out: list[Document] = [{k: v for k, v in doc.items() if k != "_id"}
                                        for doc in cursor]
@@ -168,7 +170,9 @@ class HistoryCollection:
                 self.error_sink(f"Falha Mongo (list {self.coll_name}): {exc}")
         history = self._history(JsonFile.read(self.json_path))
         # fallback JSON é um arquivo único: filtra pelo task_id
-        history = [e for e in history if e.get("task_id") == tid]
+        # ("*" = lista tudo, sem filtrar)
+        if tid != "*":
+            history = [e for e in history if e.get("task_id") == tid]
         return list(reversed(history[-limit:]))
 
     def _append_json(self, entry: Document) -> Document:
